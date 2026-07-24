@@ -7,6 +7,10 @@ import type {
   CategoriaExterna,
   StatusCustoExterno,
   TipoProjeto,
+  TeamMember,
+  TipoContrato,
+  Encargo,
+  TeamAnexo,
 } from "@/types";
 import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
@@ -19,6 +23,8 @@ type StaffRow = Database["public"]["Tables"]["internal_staff"]["Row"];
 type StaffInsert = Database["public"]["Tables"]["internal_staff"]["Insert"];
 type MilestoneRow = Database["public"]["Tables"]["milestones"]["Row"];
 type MilestoneInsert = Database["public"]["Tables"]["milestones"]["Insert"];
+type TeamRow = Database["public"]["Tables"]["team_members"]["Row"];
+type TeamInsert = Database["public"]["Tables"]["team_members"]["Insert"];
 
 const num = (v: number | null | undefined) => Number(v ?? 0);
 
@@ -140,4 +146,53 @@ export function marcoToMilestoneInsert(
   ordem: number
 ): MilestoneInsert {
   return { project_id: projectId, ordem, data_label: m.data, marco: m.marco };
+}
+
+/* ---------------- TIME / FUNCIONÁRIOS ---------------- */
+
+export function teamRowToMember(row: TeamRow): TeamMember {
+  const encargos = Array.isArray(row.encargos) ? (row.encargos as unknown as Encargo[]) : [];
+  const anexos = Array.isArray(row.anexos) ? (row.anexos as unknown as TeamAnexo[]) : [];
+  return {
+    id: row.id,
+    nome: row.nome,
+    funcao: row.funcao ?? "",
+    tipoContrato: (row.tipo_contrato as TipoContrato) ?? "CLT",
+    ativo: row.ativo,
+    salarioMensal: num(row.salario_mensal),
+    baseHorasMes: num(row.base_horas_mes),
+    encargos,
+    beneficiosMensais: num(row.beneficios_mensais),
+    cpfCnpj: row.cpf_cnpj ?? "",
+    razaoSocial: row.razao_social ?? "",
+    email: row.email ?? "",
+    telefone: row.telefone ?? "",
+    pix: row.pix ?? "",
+    endereco: row.endereco ?? "",
+    dataAdmissao: row.data_admissao ?? "",
+    observacoes: row.observacoes ?? "",
+    anexos,
+  };
+}
+
+export function memberToTeamInsert(m: Omit<TeamMember, "id">): TeamInsert {
+  return {
+    nome: m.nome,
+    funcao: m.funcao,
+    tipo_contrato: m.tipoContrato,
+    ativo: m.ativo,
+    salario_mensal: m.salarioMensal,
+    base_horas_mes: m.baseHorasMes,
+    encargos: m.encargos as unknown as TeamInsert["encargos"],
+    beneficios_mensais: m.beneficiosMensais,
+    cpf_cnpj: m.cpfCnpj,
+    razao_social: m.razaoSocial,
+    email: m.email,
+    telefone: m.telefone,
+    pix: m.pix,
+    endereco: m.endereco,
+    data_admissao: m.dataAdmissao || null,
+    observacoes: m.observacoes,
+    anexos: m.anexos as unknown as TeamInsert["anexos"],
+  };
 }

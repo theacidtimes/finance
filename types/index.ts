@@ -89,6 +89,51 @@ export interface DREResultado {
   pctRetido: number;
 }
 
+/* ================= TIME / FUNCIONÁRIOS ACID (global) ================= */
+
+export type TipoContrato = "CLT" | "PJ" | "Estágio" | "Sócio" | "Freelancer" | "Outro";
+
+/** Linha de encargo/provisão sobre o salário base (percentual editável). */
+export interface Encargo {
+  label: string; // ex.: "13º salário", "INSS patronal", "FGTS"
+  pct: number;   // % sobre o salário base
+}
+
+/** Anexo (contrato/documento) — metadados; arquivo fica no Storage. */
+export interface TeamAnexo {
+  nome: string;     // nome original do arquivo
+  path: string;     // caminho no bucket team-files
+  size: number;     // bytes
+  tipo: string;     // mime type
+  criadoEm: string; // ISO
+}
+
+export interface TeamMember {
+  id: string;
+  nome: string;
+  funcao: string;
+  tipoContrato: TipoContrato;
+  ativo: boolean;
+
+  // custo carregado
+  salarioMensal: number;      // base CLT / pró-labore / valor PJ
+  baseHorasMes: number;       // base mensal de horas (padrão 160)
+  encargos: Encargo[];        // provisões editáveis (13º, INSS, FGTS…)
+  beneficiosMensais: number;  // VR/VT/saúde fixos R$/mês
+
+  // ficha cadastral
+  cpfCnpj: string;
+  razaoSocial: string; // p/ PJ
+  email: string;
+  telefone: string;
+  pix: string;
+  endereco: string;
+  dataAdmissao: string; // ISO ou ""
+  observacoes: string;
+
+  anexos: TeamAnexo[];
+}
+
 /** Formato do arquivo JSON de projeto (compatível com o protótipo) */
 export interface ProjetoArquivo {
   app: "acid-finance";

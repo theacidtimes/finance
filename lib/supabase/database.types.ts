@@ -85,6 +85,56 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["milestones"]["Insert"]>
         Relationships: []
       }
+      team_members: {
+        Row: {
+          anexos: Json
+          ativo: boolean
+          base_horas_mes: number
+          beneficios_mensais: number
+          cpf_cnpj: string | null
+          created_at: string
+          created_by: string | null
+          data_admissao: string | null
+          email: string | null
+          encargos: Json
+          endereco: string | null
+          funcao: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          pix: string | null
+          razao_social: string | null
+          salario_mensal: number
+          telefone: string | null
+          tipo_contrato: string
+          updated_at: string
+        }
+        Insert: {
+          anexos?: Json
+          ativo?: boolean
+          base_horas_mes?: number
+          beneficios_mensais?: number
+          cpf_cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_admissao?: string | null
+          email?: string | null
+          encargos?: Json
+          endereco?: string | null
+          funcao?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          pix?: string | null
+          razao_social?: string | null
+          salario_mensal?: number
+          telefone?: string | null
+          tipo_contrato?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["team_members"]["Insert"]>
+        Relationships: []
+      }
       projects: {
         Row: {
           blocos: Json

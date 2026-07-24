@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { createProject, deleteProject, duplicateProject } from "@/lib/supabase/queries";
@@ -98,6 +99,17 @@ export function ProjetosLista({
               Finance
             </span>
           </div>
+          <nav className="flex items-center gap-1">
+            <span className="text-sm px-3 py-1.5 rounded-md bg-neutral-800 text-white font-medium">
+              Projetos
+            </span>
+            <Link
+              href="/time"
+              className="text-sm px-3 py-1.5 rounded-md text-neutral-300 hover:text-white hover:bg-neutral-800"
+            >
+              Time
+            </Link>
+          </nav>
           <div className="flex items-center gap-3">
             <span className="text-xs text-neutral-400 hidden md:inline">{userEmail}</span>
             <form action="/auth/signout" method="post">

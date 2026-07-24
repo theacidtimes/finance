@@ -73,6 +73,40 @@ create table if not exists milestones (
   marco text not null default ''
 );
 
+-- ========== TIME / FUNCIONÁRIOS ACID (global, fora de projetos) ==========
+-- Cadastro de pessoas fixas: custo mensal carregado (salário + encargos + benefícios),
+-- ficha cadastral e anexos (contratos/PJ). Vira insumo p/ orçar por volume de horas.
+create table if not exists team_members (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid references auth.users(id),
+
+  nome text not null default '',
+  funcao text default '',
+  tipo_contrato text not null default 'CLT', -- CLT | PJ | Estágio | Sócio | Freelancer | Outro
+  ativo boolean not null default true,
+
+  -- custo carregado
+  salario_mensal numeric(14,2) not null default 0,     -- base CLT / pró-labore / valor PJ
+  base_horas_mes numeric(8,2) not null default 160,
+  encargos jsonb not null default '[]'::jsonb,          -- [{label, pct}]
+  beneficios_mensais numeric(14,2) not null default 0,  -- VR/VT/saúde fixos R$/mês
+
+  -- ficha cadastral
+  cpf_cnpj text default '',
+  razao_social text default '',
+  email text default '',
+  telefone text default '',
+  pix text default '',
+  endereco text default '',
+  data_admissao date,
+  observacoes text default '',
+
+  -- anexos (metadados; arquivos no Storage bucket team-files)
+  anexos jsonb not null default '[]'::jsonb -- [{nome, path, size, tipo, criadoEm}]
+);
+
 -- updated_at automático
 create or replace function set_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end;
@@ -80,6 +114,10 @@ $$ language plpgsql;
 
 drop trigger if exists projects_updated_at on projects;
 create trigger projects_updated_at before update on projects
+  for each row execute function set_updated_at();
+
+drop trigger if exists team_members_updated_at on team_members;
+create trigger team_members_updated_at before update on team_members
   for each row execute function set_updated_at();
 
 -- ========== RLS ==========
@@ -110,7 +148,24 @@ create policy "equipe cria marcos"  on milestones for insert to authenticated wi
 create policy "equipe edita marcos" on milestones for update to authenticated using (true);
 create policy "equipe apaga marcos" on milestones for delete to authenticated using (true);
 
+alter table team_members enable row level security;
+create policy "equipe le time"    on team_members for select to authenticated using (true);
+create policy "equipe cria time"  on team_members for insert to authenticated with check (true);
+create policy "equipe edita time" on team_members for update to authenticated using (true);
+create policy "equipe apaga time" on team_members for delete to authenticated using (true);
+
 -- índices úteis
 create index if not exists idx_external_costs_project on external_costs(project_id);
 create index if not exists idx_internal_staff_project on internal_staff(project_id);
 create index if not exists idx_milestones_project on milestones(project_id);
+create index if not exists idx_team_members_ativo on team_members(ativo);
+
+-- ========== STORAGE: contratos/anexos do time ==========
+insert into storage.buckets (id, name, public)
+values ('team-files', 'team-files', false)
+on conflict (id) do nothing;
+
+create policy "team-files le"    on storage.objects for select to authenticated using (bucket_id = 'team-files');
+create policy "team-files cria"  on storage.objects for insert to authenticated with check (bucket_id = 'team-files');
+create policy "team-files edita" on storage.objects for update to authenticated using (bucket_id = 'team-files');
+create policy "team-files apaga" on storage.objects for delete to authenticated using (bucket_id = 'team-files');

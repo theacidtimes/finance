@@ -6,6 +6,7 @@ import type {
   StaffInterno,
   MarcoCronograma,
   BlocosProposta,
+  TeamMember,
 } from "@/types";
 import {
   projectRowToProjeto,
@@ -17,6 +18,8 @@ import {
   internoToStaffInsert,
   milestoneRowToMarco,
   marcoToMilestoneInsert,
+  teamRowToMember,
+  memberToTeamInsert,
 } from "./mappers";
 
 export type DB = SupabaseClient<Database>;
@@ -148,4 +151,44 @@ export async function duplicateProject(db: DB, id: string): Promise<string> {
   const newId = await createProject(db, proj, full.blocos);
   await saveProject(db, { ...full, id: newId, proj });
   return newId;
+}
+
+/* ================= TIME / FUNCIONÁRIOS ================= */
+
+export async function listTeam(db: DB): Promise<TeamMember[]> {
+  const { data, error } = await db
+    .from("team_members")
+    .select("*")
+    .order("ativo", { ascending: false })
+    .order("nome", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(teamRowToMember);
+}
+
+export async function getTeamMember(db: DB, id: string): Promise<TeamMember> {
+  const { data, error } = await db.from("team_members").select("*").eq("id", id).single();
+  if (error) throw error;
+  return teamRowToMember(data);
+}
+
+export async function createTeamMember(
+  db: DB,
+  member: Omit<TeamMember, "id">
+): Promise<string> {
+  const { data: user } = await db.auth.getUser();
+  const insert = { ...memberToTeamInsert(member), created_by: user.user?.id ?? null };
+  const { data, error } = await db.from("team_members").insert(insert).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function updateTeamMember(db: DB, member: TeamMember): Promise<void> {
+  const { id, ...rest } = member;
+  const { error } = await db.from("team_members").update(memberToTeamInsert(rest)).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTeamMember(db: DB, id: string): Promise<void> {
+  const { error } = await db.from("team_members").delete().eq("id", id);
+  if (error) throw error;
 }
