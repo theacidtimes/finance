@@ -65,11 +65,32 @@ export function NumInput({
   onChange: (v: number) => void;
   className?: string;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+  // Estado de texto local: permite apagar o campo (ficar vazio) e digitar
+  // livremente sem que um "0" fixo atrapalhe. O store continua recebendo número.
+  const [text, setText] = React.useState<string>(() =>
+    Number.isFinite(value) ? String(value) : ""
+  );
+
+  // Sincroniza quando o valor externo muda de fato (ex.: trocar de projeto),
+  // sem sobrescrever a digitação em andamento ("", "-", "1.").
+  React.useEffect(() => {
+    const parsed = text.trim() === "" ? NaN : Number(text);
+    const same = parsed === value || (Number.isNaN(parsed) && !Number.isFinite(value));
+    if (!same) setText(Number.isFinite(value) ? String(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   return (
     <input
       type="number"
-      value={Number.isFinite(value) ? value : 0}
-      onChange={(e) => onChange(Number(e.target.value))}
+      inputMode="decimal"
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw);
+        onChange(raw.trim() === "" ? 0 : Number(raw));
+      }}
+      onFocus={(e) => e.currentTarget.select()}
       className={cn(
         "border border-input rounded-md px-2 py-1 text-sm tabular-nums w-full bg-card focus:outline-none focus:ring-2 focus:ring-ring",
         className

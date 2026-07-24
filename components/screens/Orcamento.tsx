@@ -19,6 +19,32 @@ function Bloco({ n, titulo, children }: { n: string; titulo: string; children: R
   );
 }
 
+// Definido fora do componente de tela: se ficasse dentro do corpo de `Orcamento`,
+// seria recriado a cada render, desmontando o <textarea> e fazendo perder foco/rolagem.
+function Area({
+  editando,
+  value,
+  onChange,
+  rows = 4,
+}: {
+  editando: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+}) {
+  if (!editando) {
+    return <>{value || <span className="text-muted-foreground/40">—</span>}</>;
+  }
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      rows={rows}
+      className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
+    />
+  );
+}
+
 export function Orcamento() {
   const proj = useProjetoStore((s) => s.proj);
   const blocos = useProjetoStore((s) => s.blocos);
@@ -55,17 +81,9 @@ export function Orcamento() {
     }
   };
 
-  const Area = ({ k, rows = 4 }: { k: keyof BlocosProposta; rows?: number }) =>
-    editando ? (
-      <textarea
-        value={blocos[k]}
-        onChange={(e) => setBloco(k, e.target.value)}
-        rows={rows}
-        className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
-      />
-    ) : (
-      <>{blocos[k] || <span className="text-muted-foreground/40">—</span>}</>
-    );
+  const area = (k: keyof BlocosProposta, rows = 4) => (
+    <Area editando={editando} value={blocos[k]} onChange={(v) => setBloco(k, v)} rows={rows} />
+  );
 
   return (
     <div className="space-y-5">
@@ -118,8 +136,8 @@ export function Orcamento() {
         </div>
 
         <Bloco n="1" titulo="Projeto">{proj.projeto} — {proj.tipo} para {proj.cliente}.</Bloco>
-        <Bloco n="2" titulo="O serviço inclui"><Area k="servicoInclui" rows={16} /></Bloco>
-        <Bloco n="3" titulo="Especificação da entrega"><Area k="entrega" rows={2} /></Bloco>
+        <Bloco n="2" titulo="O serviço inclui">{area("servicoInclui", 16)}</Bloco>
+        <Bloco n="3" titulo="Especificação da entrega">{area("entrega", 2)}</Bloco>
 
         <Bloco n="4" titulo="Investimento">
           <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">
@@ -159,11 +177,11 @@ export function Orcamento() {
           </div>
         </Bloco>
 
-        <Bloco n="7" titulo="Não está incluso"><Area k="exclusoes" rows={4} /></Bloco>
-        <Bloco n="8" titulo="Alterações e refações"><Area k="alteracoes" rows={5} /></Bloco>
-        <Bloco n="9" titulo="Observações"><Area k="observacoes" rows={2} /></Bloco>
-        <Bloco n="10" titulo="Imagens e limitações técnicas em IA"><Area k="clausulaIA" rows={6} /></Bloco>
-        <Bloco n="11" titulo="Materiais de apoio"><Area k="materiais" rows={2} /></Bloco>
+        <Bloco n="7" titulo="Não está incluso">{area("exclusoes", 4)}</Bloco>
+        <Bloco n="8" titulo="Alterações e refações">{area("alteracoes", 5)}</Bloco>
+        <Bloco n="9" titulo="Observações">{area("observacoes", 2)}</Bloco>
+        <Bloco n="10" titulo="Imagens e limitações técnicas em IA">{area("clausulaIA", 6)}</Bloco>
+        <Bloco n="11" titulo="Materiais de apoio">{area("materiais", 2)}</Bloco>
         <Bloco n="12" titulo="Validade">
           Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
         </Bloco>
