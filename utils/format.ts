@@ -1,44 +1,33 @@
-const BRL = new Intl.NumberFormat("pt-BR", {
+const BRL2 = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const NUM = new Intl.NumberFormat("pt-BR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+const BRL0 = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  maximumFractionDigits: 0,
 });
 
-/** R$ 1.234,56 */
+/** R$ 1.234,56 — com centavos (DRE, valores exatos) */
 export function formatBRL(value: number): string {
-  return BRL.format(Number.isFinite(value) ? value : 0);
+  return BRL2.format(Number.isFinite(value) ? value : 0);
 }
 
-/** 1.234,56 (sem símbolo) */
-export function formatNumber(value: number): string {
-  return NUM.format(Number.isFinite(value) ? value : 0);
+/** R$ 1.235 — sem centavos (KPIs, dashboard) */
+export function formatBRL0(value: number): string {
+  return BRL0.format(Number.isFinite(value) ? value : 0);
 }
 
-/** 0.4136 -> "41,4%" (fração 0–1). casas = 1 por padrão */
+/** 0.4136 -> "41,4%" (fração 0–1, máx. 1 casa) */
 export function formatPct(fraction: number, casas = 1): string {
   const v = Number.isFinite(fraction) ? fraction * 100 : 0;
-  return `${v.toLocaleString("pt-BR", {
-    minimumFractionDigits: casas,
-    maximumFractionDigits: casas,
-  })}%`;
+  return `${v.toLocaleString("pt-BR", { maximumFractionDigits: casas })}%`;
 }
 
-/** 41.36 -> "41,36%" (valor já em pontos percentuais) */
-export function formatPctPoints(points: number, casas = 1): string {
-  const v = Number.isFinite(points) ? points : 0;
-  return `${v.toLocaleString("pt-BR", {
-    minimumFractionDigits: casas,
-    maximumFractionDigits: casas,
-  })}%`;
-}
-
-/** ISO ou Date -> dd/mm/aaaa */
+/** ISO ou Date -> dd/mm/aaaa (texto livre passa direto) */
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "";
   const d = typeof value === "string" ? new Date(value) : value;
