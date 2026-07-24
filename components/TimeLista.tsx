@@ -86,7 +86,7 @@ export function TimeLista({
               href="/"
               className="text-sm px-3 py-1.5 rounded-md text-neutral-300 hover:text-white hover:bg-neutral-800"
             >
-              Projetos
+              Clientes
             </Link>
             <span className="text-sm px-3 py-1.5 rounded-md bg-neutral-800 text-white font-medium">
               Time

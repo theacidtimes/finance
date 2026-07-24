@@ -7,6 +7,8 @@ import type {
   MarcoCronograma,
   BlocosProposta,
   TeamMember,
+  Cliente,
+  ClienteResumo,
 } from "@/types";
 import {
   projectRowToProjeto,
@@ -20,6 +22,8 @@ import {
   marcoToMilestoneInsert,
   teamRowToMember,
   memberToTeamInsert,
+  clientRowToCliente,
+  clienteToClientInsert,
 } from "./mappers";
 
 export type DB = SupabaseClient<Database>;
@@ -52,6 +56,29 @@ export async function listProjects(db: DB): Promise<ProjetoResumo[]> {
     .select(
       "id, cliente, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, updated_at"
     )
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    cliente: r.cliente,
+    projeto: r.projeto,
+    numeroServico: r.numero_servico,
+    tipo: r.tipo,
+    responsavel: r.responsavel ?? "",
+    data: r.data ?? "",
+    status: r.status ?? "Orçamento",
+    valorBruto: Number(r.valor_bruto ?? 0),
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function listProjectsByClient(db: DB, clientId: string): Promise<ProjetoResumo[]> {
+  const { data, error } = await db
+    .from("projects")
+    .select(
+      "id, cliente, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, updated_at"
+    )
+    .eq("client_id", clientId)
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -190,5 +217,60 @@ export async function updateTeamMember(db: DB, member: TeamMember): Promise<void
 
 export async function deleteTeamMember(db: DB, id: string): Promise<void> {
   const { error } = await db.from("team_members").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ================= CLIENTES ================= */
+
+export async function listClientes(db: DB): Promise<ClienteResumo[]> {
+  const [clientsRes, projRes] = await Promise.all([
+    db.from("clients").select("*").order("nome", { ascending: true }),
+    db.from("projects").select("client_id, valor_bruto, updated_at"),
+  ]);
+  if (clientsRes.error) throw clientsRes.error;
+  if (projRes.error) throw projRes.error;
+
+  const agg = new Map<string, { n: number; total: number; ultima: string }>();
+  for (const p of projRes.data ?? []) {
+    if (!p.client_id) continue;
+    const cur = agg.get(p.client_id) ?? { n: 0, total: 0, ultima: "" };
+    cur.n += 1;
+    cur.total += Number(p.valor_bruto ?? 0);
+    if (p.updated_at && p.updated_at > cur.ultima) cur.ultima = p.updated_at;
+    agg.set(p.client_id, cur);
+  }
+
+  return (clientsRes.data ?? []).map((row) => {
+    const c = clientRowToCliente(row);
+    const a = agg.get(c.id) ?? { n: 0, total: 0, ultima: "" };
+    return { ...c, nProjetos: a.n, totalBruto: a.total, ultimaAtualizacao: a.ultima };
+  });
+}
+
+export async function getCliente(db: DB, id: string): Promise<Cliente> {
+  const { data, error } = await db.from("clients").select("*").eq("id", id).single();
+  if (error) throw error;
+  return clientRowToCliente(data);
+}
+
+export async function createCliente(db: DB, cliente: Omit<Cliente, "id">): Promise<string> {
+  const { data: user } = await db.auth.getUser();
+  const insert = { ...clienteToClientInsert(cliente), created_by: user.user?.id ?? null };
+  const { data, error } = await db.from("clients").insert(insert).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function updateCliente(db: DB, cliente: Cliente): Promise<void> {
+  const { id, ...rest } = cliente;
+  const update = clienteToClientInsert(rest);
+  const { error } = await db.from("clients").update(update).eq("id", id);
+  if (error) throw error;
+  // mantém o texto denormalizado `cliente` dos projetos em sincronia com o nome
+  await db.from("projects").update({ cliente: cliente.nome }).eq("client_id", id);
+}
+
+export async function deleteCliente(db: DB, id: string): Promise<void> {
+  const { error } = await db.from("clients").delete().eq("id", id);
   if (error) throw error;
 }

@@ -11,6 +11,7 @@ export type CategoriaExterna =
 export interface Projeto {
   id?: string;
   cliente: string;
+  clienteId?: string | null; // FK para a entidade Cliente (agrupamento)
   projeto: string;
   numeroServico: string;
   tipo: TipoProjeto;
@@ -132,6 +133,23 @@ export interface TeamMember {
   observacoes: string;
 
   anexos: TeamAnexo[];
+}
+
+/** Cliente — entidade de agrupamento de projetos/orçamentos */
+export interface Cliente {
+  id: string;
+  nome: string;
+  contato: string;
+  email: string;
+  telefone: string;
+  observacoes: string;
+}
+
+/** Cliente com métricas agregadas dos seus projetos (para os bentos da home) */
+export interface ClienteResumo extends Cliente {
+  nProjetos: number;
+  totalBruto: number;
+  ultimaAtualizacao: string; // ISO ou ""
 }
 
 /** Formato do arquivo JSON de projeto (compatível com o protótipo) */

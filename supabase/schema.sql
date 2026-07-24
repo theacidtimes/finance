@@ -3,6 +3,21 @@
 
 create extension if not exists "pgcrypto";
 
+-- ========== CLIENTES (agrupamento de projetos/orçamentos) ==========
+create table if not exists clients (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+
+  nome text not null,
+  contato text not null default '',
+  email text not null default '',
+  telefone text not null default '',
+  observacoes text not null default ''
+);
+create unique index if not exists clients_nome_unique on clients (lower(nome));
+
 -- ========== PROJETOS ==========
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
@@ -11,6 +26,7 @@ create table if not exists projects (
   created_by uuid references auth.users(id),
 
   cliente text not null,
+  client_id uuid references clients(id) on delete set null,
   projeto text not null,
   numero_servico text not null,
   tipo text not null default 'Filme',
@@ -112,9 +128,15 @@ create or replace function set_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end;
 $$ language plpgsql;
 
+drop trigger if exists clients_updated_at on clients;
+create trigger clients_updated_at before update on clients
+  for each row execute function set_updated_at();
+
 drop trigger if exists projects_updated_at on projects;
 create trigger projects_updated_at before update on projects
   for each row execute function set_updated_at();
+
+create index if not exists idx_projects_client_id on projects (client_id);
 
 drop trigger if exists team_members_updated_at on team_members;
 create trigger team_members_updated_at before update on team_members
@@ -123,6 +145,12 @@ create trigger team_members_updated_at before update on team_members
 -- ========== RLS ==========
 -- Ferramenta interna: qualquer usuário autenticado da equipe vê e edita tudo.
 -- (Convites controlados pelo Auth do Supabase — desative signup público no painel.)
+alter table clients enable row level security;
+create policy "equipe le clientes"    on clients for select to authenticated using (true);
+create policy "equipe cria clientes"  on clients for insert to authenticated with check (true);
+create policy "equipe edita clientes" on clients for update to authenticated using (true);
+create policy "equipe apaga clientes" on clients for delete to authenticated using (true);
+
 alter table projects enable row level security;
 alter table external_costs enable row level security;
 alter table internal_staff enable row level security;

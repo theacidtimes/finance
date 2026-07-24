@@ -11,6 +11,7 @@ import type {
   TipoContrato,
   Encargo,
   TeamAnexo,
+  Cliente,
 } from "@/types";
 import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
@@ -25,6 +26,8 @@ type MilestoneRow = Database["public"]["Tables"]["milestones"]["Row"];
 type MilestoneInsert = Database["public"]["Tables"]["milestones"]["Insert"];
 type TeamRow = Database["public"]["Tables"]["team_members"]["Row"];
 type TeamInsert = Database["public"]["Tables"]["team_members"]["Insert"];
+type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
+type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
 
 const num = (v: number | null | undefined) => Number(v ?? 0);
 
@@ -32,6 +35,7 @@ export function projectRowToProjeto(row: ProjectRow): Projeto {
   return {
     id: row.id,
     cliente: row.cliente,
+    clienteId: row.client_id ?? null,
     projeto: row.projeto,
     numeroServico: row.numero_servico,
     tipo: (row.tipo as TipoProjeto) ?? "Filme",
@@ -53,6 +57,7 @@ export function projectRowToProjeto(row: ProjectRow): Projeto {
 export function projetoToProjectInsert(proj: Projeto): ProjectInsert {
   return {
     cliente: proj.cliente,
+    client_id: proj.clienteId ?? null,
     projeto: proj.projeto,
     numero_servico: proj.numeroServico,
     tipo: proj.tipo,
@@ -194,5 +199,28 @@ export function memberToTeamInsert(m: Omit<TeamMember, "id">): TeamInsert {
     data_admissao: m.dataAdmissao || null,
     observacoes: m.observacoes,
     anexos: m.anexos as unknown as TeamInsert["anexos"],
+  };
+}
+
+/* ---------------- CLIENTES ---------------- */
+
+export function clientRowToCliente(row: ClientRow): Cliente {
+  return {
+    id: row.id,
+    nome: row.nome,
+    contato: row.contato ?? "",
+    email: row.email ?? "",
+    telefone: row.telefone ?? "",
+    observacoes: row.observacoes ?? "",
+  };
+}
+
+export function clienteToClientInsert(c: Omit<Cliente, "id">): ClientInsert {
+  return {
+    nome: c.nome,
+    contato: c.contato,
+    email: c.email,
+    telefone: c.telefone,
+    observacoes: c.observacoes,
   };
 }

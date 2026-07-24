@@ -1,14 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import { listProjects } from "@/lib/supabase/queries";
-import { ProjetosLista } from "@/components/ProjetosLista";
+import { listClientes } from "@/lib/supabase/queries";
+import { ClientesBentos } from "@/components/ClientesBentos";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const supabase = await createClient();
-  const [{ data: userData }, projetos] = await Promise.all([
+  const [{ data: userData }, clientes] = await Promise.all([
     supabase.auth.getUser(),
-    listProjects(supabase),
+    listClientes(supabase),
   ]);
-  return <ProjetosLista projetos={projetos} userEmail={userData.user?.email ?? ""} />;
+  return <ClientesBentos clientes={clientes} userEmail={userData.user?.email ?? ""} />;
 }

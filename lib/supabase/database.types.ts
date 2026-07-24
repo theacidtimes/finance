@@ -135,10 +135,37 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["team_members"]["Insert"]>
         Relationships: []
       }
+      clients: {
+        Row: {
+          contato: string
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          nome: string
+          observacoes: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          contato?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          nome: string
+          observacoes?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["clients"]["Insert"]>
+        Relationships: []
+      }
       projects: {
         Row: {
           blocos: Json
           cliente: string
+          client_id: string | null
           comissao_pct: number
           condicao_pagamento: string | null
           created_at: string
@@ -162,6 +189,7 @@ export type Database = {
         Insert: {
           blocos?: Json
           cliente: string
+          client_id?: string | null
           comissao_pct?: number
           condicao_pagamento?: string | null
           created_at?: string

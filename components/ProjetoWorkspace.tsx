@@ -114,10 +114,10 @@ export function ProjetoWorkspace({
         <div className="max-w-6xl mx-auto px-5 py-4 flex flex-wrap items-center gap-4 justify-between">
           <div className="flex items-center gap-4 min-w-0">
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push(proj.clienteId ? `/clientes/${proj.clienteId}` : "/")}
               className="text-xs px-2.5 py-1.5 rounded-md border border-neutral-600 text-neutral-200 hover:border-neutral-400 hover:text-white shrink-0"
             >
-              ← Projetos
+              ← Cliente
             </button>
             <div className="flex items-baseline gap-3 min-w-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
