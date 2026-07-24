@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { createTeamMember, deleteTeamMember } from "@/lib/supabase/queries";
 import { custoHoraCarregado, custoMensalCarregado, novoMembroDefaults } from "@/lib/team";
 import { formatBRL, formatBRL0 } from "@/utils/format";
+import { AppShell } from "@/components/AppShell";
 import type { TeamMember } from "@/types";
 
 const contratoTone: Record<string, string> = {
@@ -71,64 +72,31 @@ export function TimeLista({
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="bg-neutral-950 text-white">
-        <div className="max-w-6xl mx-auto px-5 py-4 flex flex-wrap items-center gap-4 justify-between">
-          <div className="flex items-baseline gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo_acid_tight.png" alt="ACID" className="h-7 w-auto" />
-            <span className="font-display text-xl leading-none uppercase tracking-[0.18em] font-light">
-              Finance
-            </span>
-          </div>
-          <nav className="flex items-center gap-1">
-            <Link
-              href="/"
-              className="text-sm px-3 py-1.5 rounded-md text-neutral-300 hover:text-white hover:bg-neutral-800"
-            >
-              Clientes
-            </Link>
-            <span className="text-sm px-3 py-1.5 rounded-md bg-neutral-800 text-white font-medium">
-              Time
-            </span>
-          </nav>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-neutral-400 hidden md:inline">{userEmail}</span>
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="text-xs px-3 py-1.5 rounded-md border border-neutral-600 text-neutral-200 hover:border-neutral-400 hover:text-white"
-              >
-                Sair
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-5 py-6 space-y-5">
+    <AppShell userEmail={userEmail}>
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold">Time ACID</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <h1 className="font-heading text-2xl font-semibold tracking-tight">Time ACID</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Pessoas fixas e seus custos carregados — insumo para orçar por volume de horas.
             </p>
           </div>
           <button
             onClick={novoMembro}
             disabled={criando}
-            className="text-sm px-3 py-1.5 rounded-md font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            {criando ? "Criando…" : "+ Nova pessoa"}
+            <Plus className="h-4 w-4" />
+            {criando ? "Criando…" : "Nova pessoa"}
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap gap-3 items-center">
           <input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar nome, função ou contrato…"
-            className="flex-1 min-w-48 rounded-md border border-input bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex-1 min-w-48 rounded-xl border border-input bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <label className="flex items-center gap-2 text-sm text-muted-foreground px-2">
             <input
@@ -145,22 +113,22 @@ export function TimeLista({
         </div>
 
         {filtrados.length === 0 ? (
-          <div className="text-sm text-muted-foreground border border-dashed border-border rounded-xl p-10 text-center">
+          <div className="text-sm text-muted-foreground border border-dashed border-border rounded-3xl p-12 text-center">
             {membros.length === 0
               ? "Nenhuma pessoa cadastrada ainda. Adicione a primeira."
               : "Ninguém encontrado com esses filtros."}
           </div>
         ) : (
-          <div className="border border-border rounded-xl overflow-hidden">
+          <div className="border border-border rounded-3xl overflow-hidden bg-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50 text-[11px] uppercase tracking-widest text-muted-foreground">
-                  <th className="text-left px-4 py-2.5">Nome</th>
-                  <th className="text-left px-4 py-2.5 hidden sm:table-cell">Função</th>
-                  <th className="text-left px-4 py-2.5">Contrato</th>
-                  <th className="text-right px-4 py-2.5 hidden md:table-cell">Custo/mês</th>
-                  <th className="text-right px-4 py-2.5">Custo/hora</th>
-                  <th className="px-4 py-2.5"></th>
+                  <th className="text-left px-4 py-3">Nome</th>
+                  <th className="text-left px-4 py-3 hidden sm:table-cell">Função</th>
+                  <th className="text-left px-4 py-3">Contrato</th>
+                  <th className="text-right px-4 py-3 hidden md:table-cell">Custo/mês</th>
+                  <th className="text-right px-4 py-3">Custo/hora</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -216,7 +184,7 @@ export function TimeLista({
             </table>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

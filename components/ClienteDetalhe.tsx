@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
+import { ArrowLeft, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   updateCliente,
@@ -12,6 +14,7 @@ import {
 } from "@/lib/supabase/queries";
 import { novoProjetoDefaults, BLOCOS_PADRAO } from "@/data/blocos";
 import { formatBRL0, formatDate } from "@/utils/format";
+import { AppShell } from "@/components/AppShell";
 import type { Cliente, Projeto } from "@/types";
 import type { ProjetoResumo } from "@/lib/supabase/queries";
 import { cn } from "@/lib/utils";
@@ -116,73 +119,51 @@ export function ClienteDetalhe({
   const statusLabel =
     status === "saving" ? "Salvando…" : status === "error" ? "Erro ao salvar" : "Salvo";
   const statusColor =
-    status === "saving" ? "text-amber-300" : status === "error" ? "text-danger" : "text-acid";
+    status === "saving" ? "text-amber-600" : status === "error" ? "text-danger" : "text-acid-dark";
+
+  const fieldCls =
+    "mt-1 w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="bg-neutral-950 text-white">
-        <div className="max-w-6xl mx-auto px-5 py-4 flex flex-wrap items-center gap-4 justify-between">
-          <div className="flex items-center gap-4 min-w-0">
-            <button
-              onClick={() => router.push("/")}
-              className="text-xs px-2.5 py-1.5 rounded-md border border-neutral-600 text-neutral-200 hover:border-neutral-400 hover:text-white shrink-0"
-            >
-              ← Clientes
-            </button>
-            <div className="flex items-baseline gap-3 min-w-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo_acid_tight.png" alt="ACID" className="h-7 w-auto shrink-0" />
-              <span className="text-xs text-neutral-300 truncate">{cliente.nome}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={cn("text-xs tabular-nums", statusColor)}>{statusLabel}</span>
-            <span className="text-xs text-neutral-500 hidden lg:inline">{userEmail}</span>
-          </div>
+    <AppShell userEmail={userEmail}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Clientes
+          </Link>
+          <span className={cn("text-xs tabular-nums", statusColor)}>{statusLabel}</span>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-5 py-6 space-y-6">
         {/* Ficha do cliente */}
-        <section className="border border-border rounded-xl bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold">Cliente</h1>
+        <section className="border border-border rounded-3xl bg-card p-6 space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="font-heading text-xl font-semibold tracking-tight">
+              {cliente.nome || "Cliente"}
+            </h1>
             <span className="text-xs text-muted-foreground tabular-nums">
               {projetos.length} projeto(s) · {formatBRL0(total)}
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block">
               <span className="text-xs text-muted-foreground">Nome</span>
-              <input
-                value={cliente.nome}
-                onChange={(e) => set("nome", e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              <input value={cliente.nome} onChange={(e) => set("nome", e.target.value)} className={fieldCls} />
             </label>
             <label className="block">
               <span className="text-xs text-muted-foreground">Contato (pessoa)</span>
-              <input
-                value={cliente.contato}
-                onChange={(e) => set("contato", e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              <input value={cliente.contato} onChange={(e) => set("contato", e.target.value)} className={fieldCls} />
             </label>
             <label className="block">
               <span className="text-xs text-muted-foreground">E-mail</span>
-              <input
-                value={cliente.email}
-                onChange={(e) => set("email", e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              <input value={cliente.email} onChange={(e) => set("email", e.target.value)} className={fieldCls} />
             </label>
             <label className="block">
               <span className="text-xs text-muted-foreground">Telefone</span>
-              <input
-                value={cliente.telefone}
-                onChange={(e) => set("telefone", e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              <input value={cliente.telefone} onChange={(e) => set("telefone", e.target.value)} className={fieldCls} />
             </label>
             <label className="block sm:col-span-2">
               <span className="text-xs text-muted-foreground">Observações</span>
@@ -190,40 +171,43 @@ export function ClienteDetalhe({
                 value={cliente.observacoes}
                 onChange={(e) => set("observacoes", e.target.value)}
                 rows={2}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                className={cn(fieldCls, "resize-y")}
               />
             </label>
           </div>
         </section>
 
         {/* Projetos do cliente */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Projetos & orçamentos</h2>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-heading text-lg font-semibold tracking-tight">
+              Projetos &amp; orçamentos
+            </h2>
             <button
               onClick={novoProjeto}
               disabled={criando}
-              className="text-sm px-3 py-1.5 rounded-md font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {criando ? "Criando…" : "+ Novo projeto"}
+              <Plus className="h-4 w-4" />
+              {criando ? "Criando…" : "Novo projeto"}
             </button>
           </div>
 
           {projetos.length === 0 ? (
-            <div className="text-sm text-muted-foreground border border-dashed border-border rounded-xl p-10 text-center">
+            <div className="text-sm text-muted-foreground border border-dashed border-border rounded-3xl p-12 text-center">
               Nenhum projeto para este cliente ainda. Crie o primeiro.
             </div>
           ) : (
-            <div className="border border-border rounded-xl overflow-hidden">
+            <div className="border border-border rounded-3xl overflow-hidden bg-card">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50 text-[11px] uppercase tracking-widest text-muted-foreground">
-                    <th className="text-left px-4 py-2.5">Projeto</th>
-                    <th className="text-left px-4 py-2.5 hidden md:table-cell">Nº serviço</th>
-                    <th className="text-left px-4 py-2.5 hidden sm:table-cell">Data</th>
-                    <th className="text-right px-4 py-2.5">Valor</th>
-                    <th className="text-left px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5"></th>
+                    <th className="text-left px-4 py-3">Projeto</th>
+                    <th className="text-left px-4 py-3 hidden md:table-cell">Nº serviço</th>
+                    <th className="text-left px-4 py-3 hidden sm:table-cell">Data</th>
+                    <th className="text-right px-4 py-3">Valor</th>
+                    <th className="text-left px-4 py-3">Status</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -279,7 +263,7 @@ export function ClienteDetalhe({
             </div>
           )}
         </section>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

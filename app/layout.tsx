@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Libre_Caslon_Display } from "next/font/google";
+import { Inter, Libre_Caslon_Display, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-heading",
+});
 const caslon = Libre_Caslon_Display({
   subsets: ["latin"],
   weight: "400",
@@ -17,7 +22,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${caslon.variable}`}>
+    <html
+      lang="pt-BR"
+      className={`${inter.variable} ${spaceGrotesk.variable} ${caslon.variable}`}
+    >
       <body className="font-sans antialiased">
         {children}
         <Toaster position="bottom-right" richColors />
