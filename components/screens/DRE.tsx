@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { toast } from "sonner";
 import { Section } from "@/components/ui/primitives";
 import { Gauge } from "@/components/Gauge";
 import { useProjetoStore } from "@/lib/store";
@@ -44,10 +46,62 @@ function Row({
 
 export function DRE() {
   const proj = useProjetoStore((s) => s.proj);
+  const externos = useProjetoStore((s) => s.externos);
+  const internos = useProjetoStore((s) => s.internos);
   const dre = useDRE();
+  const [gerando, setGerando] = useState(false);
+
+  const exportarPDF = async () => {
+    setGerando(true);
+    try {
+      const [{ generateDreBlob }, { downloadBlob, fileBase, loadLogoDataUrl }] =
+        await Promise.all([import("@/lib/pdf/dre"), import("@/lib/export")]);
+      const logoDataUrl = await loadLogoDataUrl();
+      const blob = await generateDreBlob({ proj, dre, logoDataUrl });
+      downloadBlob(blob, `DRE_${fileBase(proj)}.pdf`);
+      toast.success("DRE em PDF gerado.");
+    } catch {
+      toast.error("Não foi possível gerar o PDF do DRE.");
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  const exportarCSV = async () => {
+    try {
+      const { downloadBlob, fileBase, projetoToCsv } = await import("@/lib/export");
+      const csv = projetoToCsv(proj, dre, externos, internos);
+      downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${fileBase(proj)}.csv`);
+      toast.success("CSV exportado.");
+    } catch {
+      toast.error("Não foi possível exportar o CSV.");
+    }
+  };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-5">
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Demonstrativo de resultado do projeto. Exporte em PDF ou CSV.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={exportarCSV}
+            className="text-sm px-3 py-1.5 rounded-md border border-input bg-card hover:bg-muted"
+          >
+            Exportar CSV
+          </button>
+          <button
+            onClick={exportarPDF}
+            disabled={gerando}
+            className="text-sm px-3 py-1.5 rounded-md text-neutral-900 font-medium hover:opacity-90 bg-acid disabled:opacity-60"
+          >
+            {gerando ? "Gerando…" : "PDF do DRE"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-5">
       <div className="lg:col-span-2">
         <Section title={`DRE — ${proj.cliente} · ${proj.projeto} · ${proj.numeroServico}`}>
           <div className="border border-border rounded-lg overflow-hidden">
@@ -84,6 +138,7 @@ export function DRE() {
         <Section title="Saúde da margem">
           <Gauge value={dre.margemOperacional} />
         </Section>
+      </div>
       </div>
     </div>
   );

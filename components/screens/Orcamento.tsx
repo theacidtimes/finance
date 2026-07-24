@@ -31,6 +31,29 @@ export function Orcamento() {
   const dre = useDRE();
 
   const [editando, setEditando] = useState(true);
+  const [gerando, setGerando] = useState(false);
+
+  const gerarPDF = async () => {
+    setGerando(true);
+    try {
+      const [{ generatePropostaBlob }, { downloadBlob, fileBase, loadLogoDataUrl }] =
+        await Promise.all([import("@/lib/pdf/proposta"), import("@/lib/export")]);
+      const logoDataUrl = await loadLogoDataUrl();
+      const blob = await generatePropostaBlob({
+        proj,
+        blocos,
+        cronograma,
+        receitaBruta: dre.receitaBruta,
+        logoDataUrl,
+      });
+      downloadBlob(blob, `Proposta_${fileBase(proj)}.pdf`);
+      toast.success("Proposta em PDF gerada.");
+    } catch {
+      toast.error("Não foi possível gerar o PDF.");
+    } finally {
+      setGerando(false);
+    }
+  };
 
   const Area = ({ k, rows = 4 }: { k: keyof BlocosProposta; rows?: number }) =>
     editando ? (
@@ -58,10 +81,11 @@ export function Orcamento() {
             {editando ? "Modo visualização" : "Editar blocos"}
           </button>
           <button
-            onClick={() => toast.info("Geração de PDF chega na Fase 4.")}
-            className="text-sm px-3 py-1.5 rounded-md text-neutral-900 font-medium hover:opacity-90 bg-acid"
+            onClick={gerarPDF}
+            disabled={gerando}
+            className="text-sm px-3 py-1.5 rounded-md text-neutral-900 font-medium hover:opacity-90 bg-acid disabled:opacity-60"
           >
-            Gerar PDF
+            {gerando ? "Gerando…" : "Gerar PDF"}
           </button>
         </div>
       </div>
