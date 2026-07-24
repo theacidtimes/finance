@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { useProjetoStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { saveProject, type ProjetoCompleto } from "@/lib/supabase/queries";
-import type { ProjetoArquivo } from "@/types";
 import { Dashboard } from "@/components/screens/Dashboard";
 import { Cadastro } from "@/components/screens/Cadastro";
 import { Pessoas } from "@/components/screens/Pessoas";
@@ -53,7 +51,6 @@ export function ProjetoWorkspace({
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("dashboard");
   const [status, setStatus] = useState<SaveStatus>("saved");
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const proj = useProjetoStore((s) => s.proj);
   const externos = useProjetoStore((s) => s.externos);
@@ -61,7 +58,6 @@ export function ProjetoWorkspace({
   const cronograma = useProjetoStore((s) => s.cronograma);
   const blocos = useProjetoStore((s) => s.blocos);
   const hydrate = useProjetoStore((s) => s.hydrate);
-  const toArquivo = useProjetoStore((s) => s.toArquivo);
 
   const readyRef = useRef(false);
   const lastSig = useRef("");
@@ -107,36 +103,6 @@ export function ProjetoWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);
 
-  const exportJSON = () => {
-    const payload = toArquivo();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${proj.cliente}_${proj.numeroServico}_${proj.projeto}`.replace(/\s+/g, "-") + ".json";
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Projeto exportado em JSON.");
-  };
-
-  const importJSON = (file: File | undefined) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const d = JSON.parse(String(reader.result)) as Partial<ProjetoArquivo>;
-        if (!d.proj || !Array.isArray(d.externos) || !Array.isArray(d.internos)) {
-          throw new Error("estrutura inválida");
-        }
-        hydrate(d);
-        toast.success(`Carregado: ${file.name} — será salvo automaticamente.`);
-      } catch {
-        toast.error("Arquivo inválido. Use um JSON exportado pelo ACID Finance.");
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const statusLabel =
     status === "saving" ? "Salvando…" : status === "error" ? "Erro ao salvar" : "Salvo";
   const statusColor =
@@ -163,29 +129,7 @@ export function ProjetoWorkspace({
           </div>
           <div className="flex items-center gap-3">
             <span className={cn("text-xs tabular-nums", statusColor)}>{statusLabel}</span>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="text-xs px-3 py-1.5 rounded-md border border-neutral-600 text-neutral-200 hover:border-neutral-400 hover:text-white"
-            >
-              Importar JSON
-            </button>
-            <button
-              onClick={exportJSON}
-              className="text-xs px-3 py-1.5 rounded-md border border-neutral-600 text-neutral-200 hover:border-neutral-400 hover:text-white"
-            >
-              Exportar JSON
-            </button>
             <span className="text-xs text-neutral-500 hidden lg:inline">{userEmail}</span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".json,application/json"
-              className="hidden"
-              onChange={(e) => {
-                importJSON(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
           </div>
         </div>
         <nav className="max-w-6xl mx-auto px-5 flex gap-1 overflow-x-auto">
