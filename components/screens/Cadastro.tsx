@@ -2,6 +2,7 @@
 
 import { Section, Field, TextInput, NumInput, Select } from "@/components/ui/primitives";
 import { useProjetoStore } from "@/lib/store";
+import { STATUS_PROJETO } from "@/data/constants";
 import type { TipoProjeto } from "@/types";
 
 const TIPOS: TipoProjeto[] = ["Filme", "KV", "Social", "Campanha", "Outro"];
@@ -21,7 +22,7 @@ export function Cadastro() {
         </Field>
         <Field label="Responsável"><TextInput value={proj.responsavel} onChange={(v) => setP("responsavel", v)} /></Field>
         <Field label="Data"><TextInput value={proj.data} onChange={(v) => setP("data", v)} /></Field>
-        <Field label="Status"><TextInput value={proj.status} onChange={(v) => setP("status", v)} /></Field>
+        <Field label="Status"><Select value={proj.status} onChange={(v) => setP("status", v)} options={[...STATUS_PROJETO]} /></Field>
         <Field label="Valor Bruto (R$)"><NumInput value={proj.valorBruto} onChange={(v) => setP("valorBruto", v)} /></Field>
         <Field label="Prazo"><TextInput value={proj.prazo} onChange={(v) => setP("prazo", v)} /></Field>
         <Field label="Impostos (%)"><NumInput value={proj.impostosPct} onChange={(v) => setP("impostosPct", v)} /></Field>
