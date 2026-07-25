@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createCliente, deleteCliente } from "@/lib/supabase/queries";
 import { formatBRL0, formatDate } from "@/utils/format";
 import { AppShell } from "@/components/AppShell";
+import { usePerfil } from "@/components/PerfilProvider";
 import type { ClienteResumo } from "@/types";
 
 export function ClientesBentos({
@@ -18,6 +19,8 @@ export function ClientesBentos({
   userEmail: string;
 }) {
   const router = useRouter();
+  const { isMaster, can } = usePerfil();
+  const podeCriar = can("criar_clientes");
   const [busca, setBusca] = useState("");
   const [criando, setCriando] = useState(false);
 
@@ -79,14 +82,16 @@ export function ClientesBentos({
               <b className="text-foreground">{formatBRL0(totalGeral)}</b>
             </p>
           </div>
-          <button
-            onClick={novoCliente}
-            disabled={criando}
-            className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            <Plus className="h-4 w-4" />
-            {criando ? "Criando…" : "Novo cliente"}
-          </button>
+          {podeCriar && (
+            <button
+              onClick={novoCliente}
+              disabled={criando}
+              className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              <Plus className="h-4 w-4" />
+              {criando ? "Criando…" : "Novo cliente"}
+            </button>
+          )}
         </div>
 
         <input
@@ -121,13 +126,15 @@ export function ClientesBentos({
                       </p>
                     )}
                   </div>
-                  <button
-                    onClick={(e) => remover(e, c.id, c.nome, c.nProjetos)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-danger transition-all shrink-0 p-1 -m-1"
-                    title="Apagar cliente"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {isMaster && (
+                    <button
+                      onClick={(e) => remover(e, c.id, c.nome, c.nProjetos)}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-danger transition-all shrink-0 p-1 -m-1"
+                      title="Apagar cliente"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-end justify-between gap-2 mt-auto">

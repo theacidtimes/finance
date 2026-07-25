@@ -161,6 +161,28 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["clients"]["Insert"]>
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          nome: string
+          permissions: Json
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          id: string
+          nome?: string
+          permissions?: Json
+          role?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>
+        Relationships: []
+      }
       projects: {
         Row: {
           blocos: Json

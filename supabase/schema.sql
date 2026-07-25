@@ -128,6 +128,68 @@ create or replace function set_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end;
 $$ language plpgsql;
 
+-- ========== PERFIS, PAPÉIS E PERMISSÕES ==========
+-- Cada auth.user tem um profile 1:1. role master|gestor; permissions jsonb por perfil.
+-- Definido cedo pois as policies de clientes usam has_perm()/is_master().
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  email text not null default '',
+  nome text not null default '',
+  role text not null default 'gestor' check (role in ('master','gestor')),
+  permissions jsonb not null default '{}'::jsonb
+);
+
+drop trigger if exists profiles_updated_at on public.profiles;
+create trigger profiles_updated_at before update on public.profiles
+  for each row execute function set_updated_at();
+
+-- Helpers de papel/permissão (security definer: ignoram RLS, sem recursão)
+create or replace function public.is_master()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'master');
+$$;
+
+create or replace function public.has_perm(perm text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+      and (role = 'master' or coalesce((permissions->>perm)::boolean, false))
+  );
+$$;
+
+-- Cria o profile automaticamente ao criar um auth.user (lê metadados do admin.createUser)
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, email, nome, role, permissions)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    coalesce(new.raw_user_meta_data->>'nome', ''),
+    coalesce(new.raw_user_meta_data->>'role', 'gestor'),
+    coalesce(new.raw_user_meta_data->'permissions', '{}'::jsonb)
+  )
+  on conflict (id) do nothing;
+  return new;
+end; $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+alter table public.profiles enable row level security;
+create policy "perfis leitura"      on public.profiles for select to authenticated using (true);
+create policy "master cria perfis"  on public.profiles for insert to authenticated with check (public.is_master());
+create policy "master edita perfis" on public.profiles for update to authenticated using (public.is_master()) with check (public.is_master());
+create policy "master apaga perfis" on public.profiles for delete to authenticated using (public.is_master());
+
+-- Promova manualmente o primeiro master (ajuste o e-mail):
+-- update public.profiles set role='master', permissions='{"criar_clientes":true,"gerar_orcamento":true}'::jsonb
+-- where email = 'bruno.zampoli@theacidtimes.com';
+
 drop trigger if exists clients_updated_at on clients;
 create trigger clients_updated_at before update on clients
   for each row execute function set_updated_at();
@@ -147,9 +209,10 @@ create trigger team_members_updated_at before update on team_members
 -- (Convites controlados pelo Auth do Supabase — desative signup público no painel.)
 alter table clients enable row level security;
 create policy "equipe le clientes"    on clients for select to authenticated using (true);
-create policy "equipe cria clientes"  on clients for insert to authenticated with check (true);
+-- criar clientes exige a permissão criar_clientes (master sempre pode); apagar é só do master
+create policy "equipe cria clientes"  on clients for insert to authenticated with check (public.has_perm('criar_clientes'));
 create policy "equipe edita clientes" on clients for update to authenticated using (true);
-create policy "equipe apaga clientes" on clients for delete to authenticated using (true);
+create policy "master apaga clientes" on clients for delete to authenticated using (public.is_master());
 
 alter table projects enable row level security;
 alter table external_costs enable row level security;

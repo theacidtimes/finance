@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Libre_Caslon_Display, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
+import { PerfilProvider } from "@/components/PerfilProvider";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} ${spaceGrotesk.variable} ${caslon.variable}`}
     >
       <body className="font-sans antialiased">
-        {children}
+        <PerfilProvider>{children}</PerfilProvider>
         <Toaster position="bottom-right" richColors />
       </body>
     </html>

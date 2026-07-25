@@ -9,6 +9,9 @@ import type {
   TeamMember,
   Cliente,
   ClienteResumo,
+  Perfil,
+  Permissions,
+  Role,
 } from "@/types";
 import {
   projectRowToProjeto,
@@ -272,5 +275,63 @@ export async function updateCliente(db: DB, cliente: Cliente): Promise<void> {
 
 export async function deleteCliente(db: DB, id: string): Promise<void> {
   const { error } = await db.from("clients").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- PERFIS / USUÁRIOS ----------
+
+const PROFILE_COLS = "id,email,nome,role,permissions";
+
+type ProfileRow = {
+  id: string;
+  email: string;
+  nome: string;
+  role: string;
+  permissions: unknown;
+};
+
+function profileRowToPerfil(row: ProfileRow): Perfil {
+  return {
+    id: row.id,
+    email: row.email ?? "",
+    nome: row.nome ?? "",
+    role: (row.role === "master" ? "master" : "gestor") as Role,
+    permissions: (row.permissions ?? {}) as Permissions,
+  };
+}
+
+/** Perfil do usuário logado (ou null se não autenticado / sem perfil) */
+export async function getMeuPerfil(db: DB): Promise<Perfil | null> {
+  const { data: u } = await db.auth.getUser();
+  if (!u.user) return null;
+  const { data, error } = await db
+    .from("profiles")
+    .select(PROFILE_COLS)
+    .eq("id", u.user.id)
+    .single();
+  if (error || !data) return null;
+  return profileRowToPerfil(data as ProfileRow);
+}
+
+/** Lista todos os perfis (apenas master consegue usar de forma útil na UI) */
+export async function listProfiles(db: DB): Promise<Perfil[]> {
+  const { data, error } = await db
+    .from("profiles")
+    .select(PROFILE_COLS)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => profileRowToPerfil(r as ProfileRow));
+}
+
+/** Atualiza nome/papel/permissões de um perfil (RLS: só master) */
+export async function updateProfile(
+  db: DB,
+  id: string,
+  patch: { nome?: string; role?: Role; permissions?: Permissions }
+): Promise<void> {
+  const { error } = await db
+    .from("profiles")
+    .update(patch as Database["public"]["Tables"]["profiles"]["Update"])
+    .eq("id", id);
   if (error) throw error;
 }

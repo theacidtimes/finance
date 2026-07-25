@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { TextInput } from "@/components/ui/primitives";
+import { usePerfil } from "@/components/PerfilProvider";
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
 import { formatBRL0 } from "@/utils/format";
@@ -55,6 +56,8 @@ export function Orcamento() {
   const updateMarco = useProjetoStore((s) => s.updateMarco);
   const removeMarco = useProjetoStore((s) => s.removeMarco);
   const dre = useDRE();
+  const { can } = usePerfil();
+  const podeGerar = can("gerar_orcamento");
 
   const [editando, setEditando] = useState(true);
   const [gerando, setGerando] = useState(false);
@@ -98,13 +101,22 @@ export function Orcamento() {
           >
             {editando ? "Modo visualização" : "Editar blocos"}
           </button>
-          <button
-            onClick={gerarPDF}
-            disabled={gerando}
-            className="text-sm px-3 py-1.5 rounded-md text-neutral-900 font-medium hover:opacity-90 bg-acid disabled:opacity-60"
-          >
-            {gerando ? "Gerando…" : "Gerar PDF"}
-          </button>
+          {podeGerar ? (
+            <button
+              onClick={gerarPDF}
+              disabled={gerando}
+              className="text-sm px-3 py-1.5 rounded-md text-neutral-900 font-medium hover:opacity-90 bg-acid disabled:opacity-60"
+            >
+              {gerando ? "Gerando…" : "Gerar PDF"}
+            </button>
+          ) : (
+            <span
+              className="text-xs text-muted-foreground px-3 py-1.5"
+              title="Você não tem permissão para gerar orçamento"
+            >
+              Sem permissão para gerar PDF
+            </span>
+          )}
         </div>
       </div>
 

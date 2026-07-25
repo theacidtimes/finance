@@ -152,6 +152,29 @@ export interface ClienteResumo extends Cliente {
   ultimaAtualizacao: string; // ISO ou ""
 }
 
+/** Papéis de acesso do sistema */
+export type Role = "master" | "gestor";
+
+/** Chaves de permissão configuráveis por perfil (master sempre tem todas) */
+export type PermissionKey = "criar_clientes" | "gerar_orcamento";
+
+export type Permissions = Partial<Record<PermissionKey, boolean>>;
+
+/** Perfil de usuário (1:1 com o auth.user do Supabase) */
+export interface Perfil {
+  id: string;
+  email: string;
+  nome: string;
+  role: Role;
+  permissions: Permissions;
+}
+
+/** Rótulos das permissões para a UI de administração */
+export const PERMISSOES: { key: PermissionKey; label: string; desc: string }[] = [
+  { key: "criar_clientes", label: "Adicionar clientes", desc: "Pode criar novos clientes" },
+  { key: "gerar_orcamento", label: "Gerar orçamento", desc: "Pode exportar a proposta em PDF" },
+];
+
 /** Formato do arquivo JSON de projeto (compatível com o protótipo) */
 export interface ProjetoArquivo {
   app: "acid-finance";

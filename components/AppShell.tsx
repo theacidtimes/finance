@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Users, type LucideIcon } from "lucide-react";
+import { LayoutGrid, Users, ShieldCheck, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePerfil } from "@/components/PerfilProvider";
 
 type NavItem = {
   href: string;
@@ -21,6 +22,13 @@ const NAV: NavItem[] = [
   },
   { href: "/time", label: "Time", icon: Users, match: (p) => p.startsWith("/time") },
 ];
+
+const NAV_MASTER: NavItem = {
+  href: "/usuarios",
+  label: "Usuários",
+  icon: ShieldCheck,
+  match: (p) => p.startsWith("/usuarios"),
+};
 
 function Wordmark() {
   return (
@@ -55,6 +63,8 @@ export function AppShell({
   userEmail: string;
 }) {
   const pathname = usePathname() ?? "/";
+  const { isMaster } = usePerfil();
+  const navItems = isMaster ? [...NAV, NAV_MASTER] : NAV;
 
   const navLink = (item: NavItem, mobile = false) => {
     const active = item.match(pathname);
@@ -84,7 +94,7 @@ export function AppShell({
         <div className="px-2">
           <Wordmark />
         </div>
-        <nav className="flex flex-col gap-1 mt-8">{NAV.map((i) => navLink(i))}</nav>
+        <nav className="flex flex-col gap-1 mt-8">{navItems.map((i) => navLink(i))}</nav>
         <div className="mt-auto pt-4 space-y-2">
           <div className="px-2 text-[11px] text-neutral-500 truncate" title={userEmail}>
             {userEmail}
@@ -100,7 +110,7 @@ export function AppShell({
           <SignOut className="w-auto" />
         </div>
         <nav className="flex gap-1 px-3 pb-2 overflow-x-auto">
-          {NAV.map((i) => navLink(i, true))}
+          {navItems.map((i) => navLink(i, true))}
         </nav>
       </header>
 
