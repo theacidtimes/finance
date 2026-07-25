@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { TextInput } from "@/components/ui/primitives";
 import { usePerfil } from "@/components/PerfilProvider";
+import { ImportarPedido } from "@/components/screens/ImportarPedido";
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
 import { formatBRL0 } from "@/utils/format";
@@ -95,6 +96,7 @@ export function Orcamento() {
           Pré-visualização da proposta comercial. &quot;Gerar PDF&quot; baixa o documento pronto para enviar.
         </p>
         <div className="flex gap-2">
+          <ImportarPedido />
           <button
             onClick={() => setEditando((e) => !e)}
             className="text-sm px-3 py-1.5 rounded-md border border-input bg-card hover:bg-muted"
@@ -132,6 +134,39 @@ export function Orcamento() {
             <span><b>Projeto:</b> {proj.projeto} ({proj.numeroServico})</span>
             <span><b>Validade:</b> {proj.validadeProposta}</span>
           </div>
+
+          {editando ? (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-3">
+              <label className="text-xs">
+                <span className="text-muted-foreground">Roteiro aprovado — link</span>
+                <TextInput
+                  value={proj.roteiroUrl ?? ""}
+                  onChange={(v) => setP("roteiroUrl", v)}
+                  placeholder="https://docs.google.com/…"
+                />
+              </label>
+              <label className="text-xs">
+                <span className="text-muted-foreground">Rótulo do link (opcional)</span>
+                <TextInput
+                  value={proj.roteiroLabel ?? ""}
+                  onChange={(v) => setP("roteiroLabel", v)}
+                  placeholder="Roteiro v3 — aprovado 20/07"
+                />
+              </label>
+            </div>
+          ) : proj.roteiroUrl && proj.roteiroUrl.trim() ? (
+            <div className="text-xs text-muted-foreground mt-3">
+              <b>Roteiro de referência:</b>{" "}
+              <a
+                href={proj.roteiroUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0FB86E] underline hover:opacity-80"
+              >
+                {proj.roteiroLabel?.trim() ? proj.roteiroLabel : proj.roteiroUrl}
+              </a>
+            </div>
+          ) : null}
         </div>
 
         <div className="mb-8">

@@ -9,6 +9,34 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      briefings: {
+        Row: {
+          arquivo_path: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          dados: Json
+          id: string
+          project_id: string | null
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          arquivo_path?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          dados?: Json
+          id?: string
+          project_id?: string | null
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["briefings"]["Insert"]>
+        Relationships: []
+      }
       external_costs: {
         Row: {
           categoria: string | null
@@ -201,6 +229,8 @@ export type Database = {
           prazo: string | null
           projeto: string
           responsavel: string | null
+          roteiro_url: string | null
+          roteiro_label: string | null
           status: string | null
           tipo: string
           titulo: string | null
@@ -225,6 +255,8 @@ export type Database = {
           prazo?: string | null
           projeto: string
           responsavel?: string | null
+          roteiro_url?: string | null
+          roteiro_label?: string | null
           status?: string | null
           tipo?: string
           titulo?: string | null

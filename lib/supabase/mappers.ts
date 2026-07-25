@@ -51,6 +51,8 @@ export function projectRowToProjeto(row: ProjectRow): Projeto {
     validadeProposta: row.validade_proposta ?? "15 dias",
     observacoes: row.observacoes ?? "",
     titulo: row.titulo ?? "",
+    roteiroUrl: row.roteiro_url ?? "",
+    roteiroLabel: row.roteiro_label ?? "",
   };
 }
 
@@ -73,6 +75,8 @@ export function projetoToProjectInsert(proj: Projeto): ProjectInsert {
     validade_proposta: proj.validadeProposta,
     observacoes: proj.observacoes,
     titulo: proj.titulo,
+    roteiro_url: proj.roteiroUrl ?? "",
+    roteiro_label: proj.roteiroLabel ?? "",
   };
 }
 

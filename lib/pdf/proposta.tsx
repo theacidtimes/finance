@@ -4,6 +4,7 @@ import {
   Text,
   View,
   Image,
+  Link,
   StyleSheet,
   pdf,
 } from "@react-pdf/renderer";
@@ -31,6 +32,8 @@ const s = StyleSheet.create({
   metaGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 12 },
   metaItem: { width: "50%", fontSize: 8, color: MUTED, marginBottom: 3 },
   metaLabel: { fontFamily: "Helvetica-Bold", color: INK },
+  roteiroRow: { width: "100%", fontSize: 8, color: MUTED, marginTop: 3 },
+  roteiroLink: { color: "#0FB86E", textDecoration: "underline" },
   titulo: { fontSize: 15, fontFamily: "Helvetica-Bold", marginBottom: 20, lineHeight: 1.3 },
   block: { marginBottom: 14 },
   blockHead: {
@@ -123,6 +126,14 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
               {proj.validadeProposta}
             </Text>
           </View>
+          {proj.roteiroUrl && proj.roteiroUrl.trim() ? (
+            <Text style={s.roteiroRow}>
+              <Text style={s.metaLabel}>Roteiro de referência: </Text>
+              <Link src={proj.roteiroUrl} style={s.roteiroLink}>
+                {proj.roteiroLabel && proj.roteiroLabel.trim() ? proj.roteiroLabel : proj.roteiroUrl}
+              </Link>
+            </Text>
+          ) : null}
         </View>
 
         <Text style={s.titulo}>{proj.titulo}</Text>

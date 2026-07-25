@@ -43,11 +43,19 @@ create table if not exists projects (
   observacoes text default '',
   titulo text default '',
 
+  -- link do roteiro aprovado (Google Docs/Slides/Drive) — "lock" do escopo na proposta
+  roteiro_url text default '',
+  roteiro_label text default '',
+
   -- blocos de texto da proposta comercial (JSON: BlocosProposta)
   blocos jsonb not null default '{}'::jsonb,
 
   unique (cliente, projeto, numero_servico)
 );
+
+-- migração idempotente p/ bancos já criados (link do roteiro aprovado)
+alter table projects add column if not exists roteiro_url   text default '';
+alter table projects add column if not exists roteiro_label text default '';
 
 -- ========== CUSTOS EXTERNOS / REPASSES ==========
 create table if not exists external_costs (
@@ -260,3 +268,43 @@ create policy "team-files le"    on storage.objects for select to authenticated 
 create policy "team-files cria"  on storage.objects for insert to authenticated with check (bucket_id = 'team-files');
 create policy "team-files edita" on storage.objects for update to authenticated using (bucket_id = 'team-files');
 create policy "team-files apaga" on storage.objects for delete to authenticated using (bucket_id = 'team-files');
+
+-- ========== PEDIDOS DE ORÇAMENTO (briefings do cliente) ==========
+-- A proposta é espelho do pedido do cliente. O cliente preenche o form público
+-- (/pedido/[token]) OU envia PDF; a equipe importa para a proposta.
+-- O cliente NÃO escreve direto no Postgres: a rota Next usa service_role e valida
+-- o token — por isso não há policy de insert anônimo aqui.
+create table if not exists briefings (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+  project_id uuid references projects(id) on delete set null,
+  token text not null unique,
+  status text not null default 'pendente' check (status in ('pendente','recebido','importado')),
+  cliente_nome text default '',
+  dados jsonb not null default '{}'::jsonb,   -- BriefingDados
+  arquivo_path text default ''                -- PDF no bucket briefings
+);
+create index if not exists idx_briefings_project on briefings(project_id);
+create index if not exists idx_briefings_token on briefings(token);
+
+drop trigger if exists briefings_updated_at on briefings;
+create trigger briefings_updated_at before update on briefings
+  for each row execute function set_updated_at();
+
+alter table briefings enable row level security;
+create policy "equipe le briefings"    on briefings for select to authenticated using (true);
+create policy "equipe cria briefings"  on briefings for insert to authenticated with check (true);
+create policy "equipe edita briefings" on briefings for update to authenticated using (true);
+create policy "equipe apaga briefings" on briefings for delete to authenticated using (true);
+
+-- bucket privado p/ PDFs de pedido de orçamento
+insert into storage.buckets (id, name, public)
+values ('briefings', 'briefings', false)
+on conflict (id) do nothing;
+
+create policy "briefings le"    on storage.objects for select to authenticated using (bucket_id = 'briefings');
+create policy "briefings cria"  on storage.objects for insert to authenticated with check (bucket_id = 'briefings');
+create policy "briefings edita" on storage.objects for update to authenticated using (bucket_id = 'briefings');
+create policy "briefings apaga" on storage.objects for delete to authenticated using (bucket_id = 'briefings');

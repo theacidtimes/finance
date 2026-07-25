@@ -53,5 +53,7 @@ export function novoProjetoDefaults() {
     validadeProposta: "15 dias",
     observacoes: "",
     titulo: "",
+    roteiroUrl: "",
+    roteiroLabel: "",
   };
 }

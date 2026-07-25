@@ -27,6 +27,8 @@ export interface Projeto {
   validadeProposta: string;
   observacoes: string;
   titulo: string; // título comercial da proposta
+  roteiroUrl?: string;   // link do roteiro aprovado (Google Docs/Slides/Drive) — "lock" do escopo
+  roteiroLabel?: string; // rótulo do link (ex.: "Roteiro v3 — aprovado 20/07")
 }
 
 export interface CustoExterno {
