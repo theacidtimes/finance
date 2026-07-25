@@ -107,16 +107,16 @@ export function ProjetoWorkspace({
   const statusLabel =
     status === "saving" ? "Salvando…" : status === "error" ? "Erro ao salvar" : "Salvo";
   const statusColor =
-    status === "saving" ? "text-amber-600" : status === "error" ? "text-danger" : "text-acid-dark";
+    status === "saving" ? "text-amber-400" : status === "error" ? "text-danger" : "text-acid";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="bg-card border-b border-border sticky top-0 z-20">
+      <header className="bg-neutral-950 border-b border-neutral-800 sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-5 py-3 flex flex-wrap items-center gap-4 justify-between">
           <div className="flex items-center gap-4 min-w-0">
             <button
               onClick={() => router.push(proj.clienteId ? `/clientes/${proj.clienteId}` : "/")}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground shrink-0 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-neutral-700 text-neutral-300 hover:border-neutral-500 hover:text-white shrink-0 transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Cliente
@@ -124,14 +124,14 @@ export function ProjetoWorkspace({
             <div className="flex items-baseline gap-3 min-w-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo_acid_tight.png" alt="ACID" className="h-6 w-auto shrink-0" />
-              <span className="text-xs text-muted-foreground tabular-nums truncate">
+              <span className="text-xs text-neutral-400 tabular-nums truncate">
                 {proj.cliente} · {proj.projeto} · {proj.numeroServico}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <span className={cn("text-xs tabular-nums", statusColor)}>{statusLabel}</span>
-            <span className="text-xs text-muted-foreground hidden lg:inline">{userEmail}</span>
+            <span className="text-xs text-neutral-400 hidden lg:inline">{userEmail}</span>
           </div>
         </div>
         <nav className="max-w-6xl mx-auto px-5 flex gap-1 overflow-x-auto">
@@ -142,8 +142,8 @@ export function ProjetoWorkspace({
               className={cn(
                 "px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors font-heading",
                 tab === id
-                  ? "border-acid text-foreground font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "border-acid text-white font-medium"
+                  : "border-transparent text-neutral-400 hover:text-white"
               )}
             >
               {label}

@@ -27,7 +27,7 @@ function Wordmark() {
     <div className="flex items-baseline gap-2.5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo_acid_tight.png" alt="ACID" className="h-6 w-auto" />
-      <span className="font-display text-lg leading-none uppercase tracking-[0.18em] font-light">
+      <span className="font-display text-lg leading-none uppercase tracking-[0.18em] font-light text-white">
         Finance
       </span>
     </div>
@@ -39,7 +39,7 @@ function SignOut({ className }: { className?: string }) {
     <form action="/auth/signout" method="post" className={className}>
       <button
         type="submit"
-        className="w-full text-xs px-3 py-2 rounded-lg border border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
+        className="w-full text-xs px-3 py-2 rounded-lg border border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-white transition-colors"
       >
         Sair
       </button>
@@ -67,8 +67,8 @@ export function AppShell({
           "flex items-center gap-3 rounded-xl text-sm font-medium transition-colors",
           mobile ? "px-3 h-10" : "px-3 h-11",
           active
-            ? "bg-neutral-900 text-white"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            ? "bg-white/10 text-white"
+            : "text-neutral-400 hover:bg-white/5 hover:text-white"
         )}
       >
         <Icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-acid")} />
@@ -80,13 +80,13 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Sidebar / dock — desktop */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-60 border-r border-border bg-card px-4 py-5">
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-60 border-r border-neutral-800 bg-neutral-950 px-4 py-5">
         <div className="px-2">
           <Wordmark />
         </div>
         <nav className="flex flex-col gap-1 mt-8">{NAV.map((i) => navLink(i))}</nav>
         <div className="mt-auto pt-4 space-y-2">
-          <div className="px-2 text-[11px] text-muted-foreground truncate" title={userEmail}>
+          <div className="px-2 text-[11px] text-neutral-500 truncate" title={userEmail}>
             {userEmail}
           </div>
           <SignOut />
@@ -94,7 +94,7 @@ export function AppShell({
       </aside>
 
       {/* Top bar — mobile */}
-      <header className="md:hidden sticky top-0 z-20 bg-card border-b border-border">
+      <header className="md:hidden sticky top-0 z-20 bg-neutral-950 border-b border-neutral-800">
         <div className="flex items-center justify-between px-4 h-14">
           <Wordmark />
           <SignOut className="w-auto" />
