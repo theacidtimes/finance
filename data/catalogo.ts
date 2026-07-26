@@ -98,9 +98,12 @@ export const CATALOGO: ProdutoCatalogo[] = [
     modeloPreco: "valor",
     modulosPadrao: MODULOS_VIDEO_IA,
     exclusoesPadrao: EXCLUSOES_IA,
-    entregaTemplate: `1 filme — secundagem 30" (+ reduções conforme cronograma)
-Formatos: MP4 16:9 / 9:16 · Território: Nacional · Direitos de uso: 12 meses
-Trilha: stock/IA`,
+    entregaTemplate: `Entregável: 1 filme (+ reduções conforme cronograma)
+Duração: 30"
+Formato: MP4 16:9 / 9:16
+Território: Nacional
+Tempo de uso: 12 meses
+Trilha: Stock / IA`,
   },
   {
     id: "vinheta",
@@ -112,8 +115,11 @@ Trilha: stock/IA`,
     modeloPreco: "valor",
     modulosPadrao: MODULOS_VIDEO_IA,
     exclusoesPadrao: EXCLUSOES_IA,
-    entregaTemplate: `1 vinheta — secundagem 5"–15"
-Formatos: MP4 16:9 / 9:16 · Território: Nacional · Direitos de uso: 12 meses`,
+    entregaTemplate: `Entregável: 1 vinheta
+Duração: 5"–15"
+Formato: MP4 16:9 / 9:16
+Território: Nacional
+Tempo de uso: 12 meses`,
   },
   {
     id: "video-reel",
@@ -125,8 +131,12 @@ Formatos: MP4 16:9 / 9:16 · Território: Nacional · Direitos de uso: 12 meses`
     modeloPreco: "valor",
     modulosPadrao: MODULOS_VIDEO_IA,
     exclusoesPadrao: EXCLUSOES_IA,
-    entregaTemplate: `1 reel — secundagem 15"–60"
-Formatos: MP4 9:16 · Território: Nacional · Direitos de uso: 6 meses · Mídia: Digital / Instagram`,
+    entregaTemplate: `Entregável: 1 reel
+Duração: 15"–60"
+Formato: MP4 9:16
+Território: Nacional
+Tempo de uso: 6 meses
+Mídia: Digital / Instagram`,
   },
   {
     id: "video-ugc",
@@ -138,8 +148,12 @@ Formatos: MP4 9:16 · Território: Nacional · Direitos de uso: 6 meses · Mídi
     modeloPreco: "valor",
     modulosPadrao: MODULOS_VIDEO_IA,
     exclusoesPadrao: EXCLUSOES_IA,
-    entregaTemplate: `Peças UGC — secundagem curta (15"–30")
-Formatos: MP4 9:16 · Território: Nacional · Direitos de uso: 6 meses · Mídia: Redes sociais`,
+    entregaTemplate: `Entregável: Peças UGC
+Duração: 15"–30"
+Formato: MP4 9:16
+Território: Nacional
+Tempo de uso: 6 meses
+Mídia: Redes sociais`,
   },
 
   // ---- Família B: imagem/design IA ----
@@ -162,8 +176,12 @@ Formatos: MP4 9:16 · Território: Nacional · Direitos de uso: 6 meses · Mídi
       "Trilhas compostas e sound effects",
       "Registro ANCINE",
     ],
-    entregaTemplate: `KV animados: 10" — 16:9 / 9:16 · KV estáticos: TIFF/PSD 1:1 300 DPI
-Território: Nacional · Direitos de uso: 12 meses · Mídia: Digital, redes e OOH`,
+    entregaTemplate: `Entregável: KV animado + KV estático
+Duração: 10" (versão animada)
+Formato: MP4 16:9 / 9:16 · TIFF/PSD 1:1 300 DPI
+Território: Nacional
+Tempo de uso: 12 meses
+Mídia: Digital, redes e OOH`,
   },
   {
     id: "brand-assets",
@@ -183,8 +201,10 @@ Território: Nacional · Direitos de uso: 12 meses · Mídia: Digital, redes e O
       "Trilhas compostas e sound effects",
       "Registro ANCINE",
     ],
-    entregaTemplate: `Conjunto de assets de marca — formatos digitais (PNG/SVG/TIFF conforme uso)
-Território: Nacional · Direitos de uso: 12 meses`,
+    entregaTemplate: `Entregável: Conjunto de assets de marca
+Formato: PNG / SVG / TIFF (conforme uso)
+Território: Nacional
+Tempo de uso: 12 meses`,
   },
   {
     id: "banco-imagens",
@@ -205,8 +225,10 @@ Território: Nacional · Direitos de uso: 12 meses`,
       "Registro ANCINE",
       "Fotografia em estúdio",
     ],
-    entregaTemplate: `Lote de imagens — TIFF/PSD, 150/300 DPI
-Território: Nacional · Direitos de uso: 12 meses`,
+    entregaTemplate: `Entregável: Lote de imagens (hero + variações)
+Formato: TIFF/PSD 150/300 DPI
+Território: Nacional
+Tempo de uso: 12 meses`,
   },
 
   // ---- Família C: copy/estático (SEM blocos de IA) ----
@@ -220,9 +242,11 @@ Território: Nacional · Direitos de uso: 12 meses`,
     modeloPreco: "valor",
     modulosPadrao: ["Criação de layout e redação para peça institucional/publicitária"],
     exclusoesPadrao: [],
-    entregaTemplate: `1 layout — formato conforme peça (ex.: 210×280mm)
-Formato de arquivo: PSD · Território: Nacional · Direitos: 3 meses
-Obs.: finalização para os meios feita internamente pelo contratante`,
+    entregaTemplate: `Entregável: 1 layout
+Formato: PSD — dimensões conforme peça (ex.: 210×280mm)
+Território: Nacional
+Tempo de uso: 3 meses
+Observação: finalização para os meios feita internamente pelo contratante`,
   },
   {
     id: "spots",
@@ -234,8 +258,11 @@ Obs.: finalização para os meios feita internamente pelo contratante`,
     modeloPreco: "valor",
     modulosPadrao: ["Criação de roteiro para spot/texto-cabine"],
     exclusoesPadrao: [],
-    entregaTemplate: `1 roteiro para spot — secundagem 30"
-Território: Nacional · Direitos: 6 meses · Mídia: Rádio`,
+    entregaTemplate: `Entregável: 1 roteiro para spot
+Duração: 30"
+Território: Nacional
+Tempo de uso: 6 meses
+Mídia: Rádio`,
   },
   {
     id: "anuncios",
@@ -247,8 +274,11 @@ Território: Nacional · Direitos: 6 meses · Mídia: Rádio`,
     modeloPreco: "valor",
     modulosPadrao: ["Criação de texto para anúncio (impresso/digital)"],
     exclusoesPadrao: [],
-    entregaTemplate: `1 anúncio — formato conforme veículo
-Território: Nacional · Direitos: 3 meses · Mídia: Impresso / Digital`,
+    entregaTemplate: `Entregável: 1 anúncio
+Formato: conforme veículo
+Território: Nacional
+Tempo de uso: 3 meses
+Mídia: Impresso / Digital`,
   },
 
   // ---- Família D: comercial/sem produção ----
@@ -262,8 +292,10 @@ Território: Nacional · Direitos: 3 meses · Mídia: Impresso / Digital`,
     modeloPreco: "valor",
     modulosPadrao: ["Extensão do prazo de veiculação / ampliação de praça"],
     exclusoesPadrao: [],
-    entregaTemplate: `Extensão dos direitos de uso da peça — novo período/praça a definir
-Variante "+TV": finalização para TV + registro ANCINE, emissão CRT e recolhimento CONDECINE`,
+    entregaTemplate: `Entregável: Extensão dos direitos de uso da peça já entregue
+Tempo de uso: novo período a definir
+Território: nova praça a definir
+Variante +TV: finalização para TV + registro ANCINE, emissão CRT e recolhimento CONDECINE`,
   },
 
   // ---- Família E: modelos próprios (campos especiais na UI) ----
@@ -284,8 +316,9 @@ Variante "+TV": finalização para TV + registro ANCINE, emissão CRT e recolhim
       "Peça final finalizada (o sprint entrega concepts/exploração)",
       "Registro ANCINE",
     ],
-    entregaTemplate: `Concepts visuais em IA — entregues por diária alocada
-Modelo: 1 diária avulsa ou pacote mínimo de diárias atrelado a volume/horas`,
+    entregaTemplate: `Entregável: Concepts visuais em IA, por diária alocada
+Formato: stills e/ou animações de referência
+Modelo: 1 diária avulsa ou pacote mínimo atrelado a volume/horas`,
     camposEspeciais: ["nº de diárias", "valor por diária", "volume/horas mínimas"],
   },
   {
@@ -301,8 +334,9 @@ Modelo: 1 diária avulsa ou pacote mínimo de diárias atrelado a volume/horas`,
       "Publicação em parceria (carrossel / reel / post)",
     ],
     exclusoesPadrao: [],
-    entregaTemplate: `Entregáveis de mídia no perfil @acid — definir formato e volume:
-carrossel, reel e/ou post estático (quantidade a combinar)`,
+    entregaTemplate: `Entregável: Publicação no perfil @acid
+Formato: carrossel, reel e/ou post estático (quantidade a combinar)
+Mídia: Instagram @acid`,
     camposEspeciais: ["tipo de post (carrossel/reel/post)", "quantidade"],
   },
   {
@@ -322,8 +356,9 @@ carrossel, reel e/ou post estático (quantidade a combinar)`,
       "Manutenção evolutiva após a entrega (contratada à parte)",
       "Custos recorrentes de infraestrutura/APIs de terceiros",
     ],
-    entregaTemplate: `Mini-app de IA — escopo e funcionalidades definidos na proposta
-Entrega: aplicação funcional conforme escopo · prazo de desenvolvimento a definir`,
+    entregaTemplate: `Entregável: Mini-app de IA — aplicação funcional conforme escopo
+Formato: aplicação web
+Prazo de desenvolvimento: a definir`,
     camposEspeciais: ["escopo/funcionalidades", "prazo de dev"],
   },
 ];

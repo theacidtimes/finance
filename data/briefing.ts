@@ -112,18 +112,32 @@ export const CAMPOS_BRIEFING: CampoBriefing[] = [
  * Importador: pedido → proposta
  * ========================================================== */
 
-/** Monta uma "Especificação da entrega" a partir dos campos do pedido. */
+/**
+ * Monta uma "Especificação da entrega" a partir dos campos do pedido.
+ *
+ * Formato de ficha (padrão dos PDFs da ACID): um campo por linha, no formato
+ * `Rótulo: valor`. A proposta renderiza o rótulo em negrito — por isso nunca
+ * empacote vários campos na mesma linha.
+ */
 export function entregaDoBriefing(d: BriefingDados): string {
   const linhas: string[] = [];
-  if (d.escopoLivre.trim()) linhas.push(d.escopoLivre.trim());
-  if (d.duracao.trim()) linhas.push(`Duração: ${d.duracao.trim()}`);
-  if (d.formatos.trim()) linhas.push(`Formatos: ${d.formatos.trim()}`);
-  if (d.territorio.trim()) linhas.push(`Território: ${d.territorio.trim()}`);
-  if (d.periodoDireitos.trim()) linhas.push(`Direitos de uso: ${d.periodoDireitos.trim()}`);
-  if (d.midias.trim()) linhas.push(`Mídias: ${d.midias.trim()}`);
-  if (d.acessibilidade.trim()) linhas.push(`Acessibilidade: ${d.acessibilidade.trim()}`);
-  if (d.deliveriesImagem.trim()) linhas.push(`Deliveries de imagem: ${d.deliveriesImagem.trim()}`);
-  if (d.deliveriesAudio.trim()) linhas.push(`Deliveries de áudio: ${d.deliveriesAudio.trim()}`);
+  const campo = (rotulo: string, valor: string) => {
+    const v = valor.trim();
+    if (v) linhas.push(`${rotulo}: ${v}`);
+  };
+
+  campo("Entregável", d.escopoLivre);
+  campo("Duração", d.duracao);
+  campo("Formato", d.formatos);
+  campo("Território", d.territorio);
+  campo("Tempo de uso", d.periodoDireitos);
+  campo("Mídia", d.midias);
+  campo("Trilha", d.trilha);
+  campo("Locução", d.locucao);
+  campo("Acessibilidade", d.acessibilidade);
+  campo("Deliveries de imagem", d.deliveriesImagem);
+  campo("Deliveries de áudio", d.deliveriesAudio);
+
   return linhas.join("\n");
 }
 

@@ -126,6 +126,39 @@ function SeletorProdutos({
   );
 }
 
+/**
+ * Separa "Rótulo: valor" para destacar o rótulo em negrito.
+ * Devolve null quando a linha não é um campo de ficha (prosa, bullet, URL).
+ */
+function partesFicha(linha: string): { rotulo: string; valor: string } | null {
+  const m = linha.match(/^\s*([^:]{2,32}):\s?(.*)$/);
+  if (!m) return null;
+  if (m[2].startsWith("//")) return null; // https://… não é rótulo
+  return { rotulo: m[1].trim(), valor: m[2] };
+}
+
+/**
+ * Bloco em formato de ficha (padrão dos PDFs da ACID): um campo por linha,
+ * rótulo em negrito. Linhas que não seguem "Rótulo: valor" saem como texto.
+ */
+function Ficha({ texto }: { texto: string }) {
+  if (!texto.trim()) return <span className="text-muted-foreground/40">—</span>;
+  return (
+    <div className="space-y-0.5">
+      {texto.split("\n").map((linha, i) => {
+        const p = partesFicha(linha);
+        if (!p) return <div key={i}>{linha || "\u00A0"}</div>;
+        return (
+          <div key={i}>
+            <span className="font-semibold">{p.rotulo}:</span>
+            {p.valor ? ` ${p.valor}` : ""}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Definido fora do componente de tela: se ficasse dentro do corpo de `Orcamento`,
 // seria recriado a cada render, desmontando o <textarea> e fazendo perder foco/rolagem.
 function Area({
@@ -133,22 +166,33 @@ function Area({
   value,
   onChange,
   rows = 4,
+  ficha = false,
 }: {
   editando: boolean;
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  ficha?: boolean;
 }) {
   if (!editando) {
+    if (ficha) return <Ficha texto={value} />;
     return <>{value || <span className="text-muted-foreground/40">—</span>}</>;
   }
   return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      rows={rows}
-      className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
-    />
+    <>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      {ficha && (
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Um campo por linha, no formato <code>Rótulo: valor</code> (ex.:{" "}
+          <code>Tempo de uso: 12 meses</code>). O rótulo sai em negrito na proposta.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -190,8 +234,14 @@ export function Orcamento() {
     }
   };
 
-  const area = (k: keyof BlocosProposta, rows = 4) => (
-    <Area editando={editando} value={blocos[k]} onChange={(v) => setBloco(k, v)} rows={rows} />
+  const area = (k: keyof BlocosProposta, rows = 4, ficha = false) => (
+    <Area
+      editando={editando}
+      value={blocos[k]}
+      onChange={(v) => setBloco(k, v)}
+      rows={rows}
+      ficha={ficha}
+    />
   );
 
   // Regenera apenas os blocos derivados; os fixos (IA, materiais, cancelamento)
@@ -301,7 +351,7 @@ export function Orcamento() {
 
         <Bloco n="1" titulo="Projeto">{proj.projeto} — {proj.tipo} para {proj.cliente}.</Bloco>
         <Bloco n="2" titulo="O serviço inclui">{area("servicoInclui", 16)}</Bloco>
-        <Bloco n="3" titulo="Especificação da entrega">{area("entrega", 2)}</Bloco>
+        <Bloco n="3" titulo="Especificação da entrega">{area("entrega", 8, true)}</Bloco>
 
         <Bloco n="4" titulo="Investimento">
           <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">

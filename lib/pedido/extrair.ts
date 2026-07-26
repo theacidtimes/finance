@@ -25,6 +25,9 @@ Regras:
 - NUNCA invente valores, datas ou serviços não mencionados.
 - Transcreva fielmente; pode resumir textos longos, mas sem alterar o sentido.
 - "escopo" mapeia o que o cliente pediu para os produtos do catálogo abaixo (por id). Só inclua um produto se o pedido claramente corresponder a ele. Se o cliente pediu algo fora do catálogo, deixe "escopo" vazio e descreva em "escopoLivre".
+- SEMPRE decomponha a especificação técnica nos campos próprios: duracao, formatos, territorio, periodoDireitos, midias, trilha, locucao, acessibilidade, deliveriesImagem, deliveriesAudio. Nunca despeje a especificação inteira em um campo só.
+- "escopoLivre" é apenas a descrição curta do entregável (ex.: "Peça 3D para fachada — 01 vídeo"). Não repita nele o que já foi para os campos técnicos.
+- Ressalvas e condições do cliente que não sejam especificação técnica vão em "observacoes".
 - Os campos são em português.
 
 Catálogo de produtos (use o id em "escopo.produtoId"):

@@ -46,6 +46,8 @@ const s = StyleSheet.create({
     marginBottom: 5,
   },
   body: { fontSize: 10, lineHeight: 1.55 },
+  fichaRow: { fontSize: 10, lineHeight: 1.55, marginBottom: 1 },
+  fichaLabel: { fontFamily: "Helvetica-Bold" },
   investBox: {
     borderWidth: 1,
     borderColor: INK,
@@ -85,6 +87,34 @@ function Block({ n, titulo, children }: { n: string; titulo: string; children: R
       </Text>
       {children}
     </View>
+  );
+}
+
+/**
+ * Bloco em formato de ficha: um campo por linha, rótulo em negrito.
+ * Espelha o `Ficha` da tela (components/screens/Orcamento.tsx).
+ */
+function Ficha({ texto }: { texto: string }) {
+  if (!texto.trim()) return <Text style={s.body}>—</Text>;
+  return (
+    <>
+      {texto.split("\n").map((linha, i) => {
+        const m = linha.match(/^\s*([^:]{2,32}):\s?(.*)$/);
+        if (!m || m[2].startsWith("//")) {
+          return (
+            <Text key={i} style={s.fichaRow}>
+              {linha}
+            </Text>
+          );
+        }
+        return (
+          <Text key={i} style={s.fichaRow}>
+            <Text style={s.fichaLabel}>{m[1].trim()}:</Text>
+            {m[2] ? ` ${m[2]}` : ""}
+          </Text>
+        );
+      })}
+    </>
   );
 }
 
@@ -148,7 +178,7 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
           <Text style={s.body}>{dash(blocos.servicoInclui)}</Text>
         </Block>
         <Block n="3" titulo="Especificação da entrega">
-          <Text style={s.body}>{dash(blocos.entrega)}</Text>
+          <Ficha texto={blocos.entrega} />
         </Block>
 
         <Block n="4" titulo="Investimento">
