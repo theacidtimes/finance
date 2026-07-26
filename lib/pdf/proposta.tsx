@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
 import { formatBRL0 } from "@/utils/format";
+import { TEXTOS_MESTRE } from "@/data/catalogo";
 
 const INK = "#111111";
 const MUTED = "#6B7280";
@@ -184,13 +185,16 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
         <Block n="9" titulo="Observações">
           <Text style={s.body}>{dash(blocos.observacoes)}</Text>
         </Block>
-        <Block n="10" titulo="Imagens e limitações técnicas em IA">
-          <Text style={s.body}>{dash(blocos.clausulaIA)}</Text>
+        <Block n="10" titulo="Cancelamento">
+          <Text style={s.body}>{TEXTOS_MESTRE.cancelamento}</Text>
         </Block>
-        <Block n="11" titulo="Materiais de apoio">
-          <Text style={s.body}>{dash(blocos.materiais)}</Text>
+        <Block n="11" titulo="Imagens e limitações técnicas em IA">
+          <Text style={s.body}>{TEXTOS_MESTRE.clausulaIA}</Text>
         </Block>
-        <Block n="12" titulo="Validade">
+        <Block n="12" titulo="Materiais de apoio">
+          <Text style={s.body}>{TEXTOS_MESTRE.materiais}</Text>
+        </Block>
+        <Block n="13" titulo="Validade">
           <Text style={s.body}>
             Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
           </Text>

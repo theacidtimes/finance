@@ -5,12 +5,9 @@ import type { BlocosProposta } from "@/types";
  *
  * Derivado da análise de 53 propostas (docs/catalogo-parte-A.md / -B.md).
  * Este arquivo NÃO contém lógica financeira: apenas monta o TEXTO/estrutura da
- * proposta (blocos). A escolha de um produto pré-preenche os blocos; tudo
- * permanece editável por projeto.
- *
- * Regra de negócio observada nos PDFs reais: a política de cancelamento é
- * redigida dentro do bloco "Observações" (ATTO nº24/25), por isso injetamos o
- * texto de cancelamento em `observacoes` em vez de criar um bloco novo.
+ * proposta (blocos). A escolha de um produto pré-preenche os blocos derivados;
+ * os blocos de política (cláusula de IA, materiais de apoio, cancelamento) são
+ * FIXOS — renderizados direto do TEXTOS_MESTRE, sem passar pelo estado editável.
  */
 
 export type FamiliaProduto =
@@ -67,7 +64,7 @@ export const TEXTOS_MESTRE = {
 - Rounds extras mediante orçamento à parte
 - Alterações de escopo ou roteiro após aprovação da proposta geram custos extras, orçados caso a caso`,
 
-  /** Política de cancelamento — vai dentro de "Observações" (padrão ATTO). */
+  /** Política de cancelamento — bloco FIXO próprio na proposta. */
   cancelamento: `Caso o orçamento seja aprovado e, durante a produção, por qualquer motivo o projeto seja paralisado ou cancelado por parte do Cliente ou Agência, será cobrado 50% ou 100% do valor do trabalho — a ser negociado com a produtora — dependendo da fase em que estiver a produção.`,
 } as const;
 
@@ -358,8 +355,10 @@ const BLOCOS_VAZIOS: BlocosProposta = {
  * Regras de mesclagem:
  * - "O serviço inclui" e "Especificação da entrega" → agrupados por produto;
  * - "Não está incluso" → união sem duplicatas;
- * - blocos legais (alterações, cancelamento, cláusula IA, materiais) → uma vez só;
- * - cláusula de IA / materiais entram se QUALQUER item for produto de IA.
+ * - "Alterações e refações" → uma vez só (carrega o nº de rounds, editável).
+ *
+ * Os blocos FIXOS (cancelamento, cláusula de IA, materiais de apoio) NÃO são
+ * gerados aqui: a proposta os renderiza direto do TEXTOS_MESTRE.
  *
  * @param rounds nº de rodadas de ajuste por etapa (default 1)
  */
@@ -391,18 +390,19 @@ export function blocosParaProdutos(itens: ItemProposta[], rounds = 1): BlocosPro
   produtos.forEach(({ p }) => p.exclusoesPadrao.forEach((e) => exclSet.add(e)));
   const exclusoes = exclSet.size ? [...exclSet].map((x) => `- ${x}`).join("\n") : "";
 
-  // blocos legais — uma vez só; dependem de haver algum produto "completo"/IA
+  // "Alterações e refações" — uma vez só; só quando há produto "completo".
   const algumCompleto = produtos.some(({ p }) => p.formatoProposta !== "simplificado");
-  const algumIA = produtos.some(({ p }) => p.blocosIA);
 
+  // Blocos fixos (cancelamento, cláusula IA, materiais) NÃO são gerados aqui —
+  // a proposta os renderiza direto do TEXTOS_MESTRE, sempre.
   return {
     servicoInclui,
     entrega,
     exclusoes,
     alteracoes: algumCompleto ? TEXTOS_MESTRE.alteracoes.replace("{rounds}", String(rounds)) : "",
-    observacoes: algumCompleto ? TEXTOS_MESTRE.cancelamento : "",
-    clausulaIA: algumIA ? TEXTOS_MESTRE.clausulaIA : "",
-    materiais: algumIA ? TEXTOS_MESTRE.materiais : "",
+    observacoes: "",
+    clausulaIA: "",
+    materiais: "",
   };
 }
 

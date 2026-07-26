@@ -8,16 +8,121 @@ import { ImportarPedido } from "@/components/screens/ImportarPedido";
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
 import { formatBRL0 } from "@/utils/format";
+import { CATALOGO, TEXTOS_MESTRE, blocosParaProdutos, type ItemProposta } from "@/data/catalogo";
 import type { BlocosProposta } from "@/types";
 
-function Bloco({ n, titulo, children }: { n: string; titulo: string; children: React.ReactNode }) {
+function Bloco({
+  n,
+  titulo,
+  fixo,
+  children,
+}: {
+  n: string;
+  titulo: string;
+  fixo?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mb-6">
-      <h4 className="text-[11px] tracking-[0.2em] uppercase font-semibold text-muted-foreground mb-2">
+      <h4 className="text-[11px] tracking-[0.2em] uppercase font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
         {n}. {titulo}
+        {fixo && (
+          <span
+            className="text-[8px] tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border normal-case"
+            title="Texto padrão da ACID — editável apenas no texto-mestre (mesmo para todos os projetos)"
+          >
+            fixo
+          </span>
+        )}
       </h4>
       <div className="text-sm leading-relaxed whitespace-pre-wrap">{children}</div>
     </div>
+  );
+}
+
+/** Seletor de produtos do catálogo — regenera os blocos derivados da proposta. */
+function SeletorProdutos({
+  onAplicar,
+}: {
+  onAplicar: (itens: ItemProposta[]) => void;
+}) {
+  const [sel, setSel] = useState<Record<string, number>>({});
+
+  const toggle = (id: string) =>
+    setSel((s) => {
+      const next = { ...s };
+      if (next[id]) delete next[id];
+      else next[id] = 1;
+      return next;
+    });
+
+  const setQtd = (id: string, q: number) =>
+    setSel((s) => ({ ...s, [id]: Math.max(1, q || 1) }));
+
+  const itens: ItemProposta[] = Object.entries(sel).map(([produtoId, quantidade]) => ({
+    produtoId,
+    quantidade,
+  }));
+
+  return (
+    <details className="mb-5 rounded-lg border border-border bg-muted/30">
+      <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium">
+        Inserir produtos do catálogo
+        <span className="text-xs text-muted-foreground ml-2">
+          preenche serviço, entrega, não incluso e alterações
+        </span>
+      </summary>
+      <div className="px-4 pb-4 pt-1 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {CATALOGO.map((p) => {
+            const on = Boolean(sel[p.id]);
+            return (
+              <div
+                key={p.id}
+                className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm ${
+                  on ? "border-acid bg-acid/5" : "border-border bg-card"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => toggle(p.id)}
+                  className="accent-acid w-4 h-4 shrink-0"
+                />
+                <span className="flex-1 truncate" title={p.descricao}>
+                  {p.label}
+                </span>
+                {on && (
+                  <input
+                    type="number"
+                    min={1}
+                    value={sel[p.id]}
+                    onChange={(e) => setQtd(p.id, Number(e.target.value))}
+                    className="w-14 border border-input rounded px-1.5 py-0.5 text-sm bg-card tabular-nums"
+                    title="Quantidade"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            {itens.length ? `${itens.length} produto(s) selecionado(s)` : "Nenhum produto selecionado"}
+          </span>
+          <button
+            onClick={() => onAplicar(itens)}
+            disabled={!itens.length}
+            className="text-sm px-3 py-1.5 rounded-md text-neutral-900 font-medium hover:opacity-90 bg-acid disabled:opacity-40"
+          >
+            Aplicar produtos
+          </button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Sobrescreve os blocos derivados. Os textos fixos (cláusula de IA, materiais, cancelamento) não são afetados.
+        </p>
+      </div>
+    </details>
   );
 }
 
@@ -89,6 +194,16 @@ export function Orcamento() {
     <Area editando={editando} value={blocos[k]} onChange={(v) => setBloco(k, v)} rows={rows} />
   );
 
+  // Regenera apenas os blocos derivados; os fixos (IA, materiais, cancelamento)
+  // vêm do TEXTOS_MESTRE e não passam pelo estado.
+  const aplicarProdutos = (itens: ItemProposta[]) => {
+    const b = blocosParaProdutos(itens);
+    (["servicoInclui", "entrega", "exclusoes", "alteracoes"] as const).forEach((k) => {
+      if (b[k].trim()) setBloco(k, b[k]);
+    });
+    toast.success("Produtos aplicados à proposta.");
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -121,6 +236,8 @@ export function Orcamento() {
           )}
         </div>
       </div>
+
+      {editando && <SeletorProdutos onAplicar={aplicarProdutos} />}
 
       <div className="bg-card border border-border rounded-xl p-8 md:p-12 max-w-3xl mx-auto">
         <div className="border-b-2 border-foreground pb-5 mb-8">
@@ -227,9 +344,10 @@ export function Orcamento() {
         <Bloco n="7" titulo="Não está incluso">{area("exclusoes", 4)}</Bloco>
         <Bloco n="8" titulo="Alterações e refações">{area("alteracoes", 5)}</Bloco>
         <Bloco n="9" titulo="Observações">{area("observacoes", 2)}</Bloco>
-        <Bloco n="10" titulo="Imagens e limitações técnicas em IA">{area("clausulaIA", 6)}</Bloco>
-        <Bloco n="11" titulo="Materiais de apoio">{area("materiais", 2)}</Bloco>
-        <Bloco n="12" titulo="Validade">
+        <Bloco n="10" titulo="Cancelamento" fixo>{TEXTOS_MESTRE.cancelamento}</Bloco>
+        <Bloco n="11" titulo="Imagens e limitações técnicas em IA" fixo>{TEXTOS_MESTRE.clausulaIA}</Bloco>
+        <Bloco n="12" titulo="Materiais de apoio" fixo>{TEXTOS_MESTRE.materiais}</Bloco>
+        <Bloco n="13" titulo="Validade">
           Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
         </Bloco>
       </div>
