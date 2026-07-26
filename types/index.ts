@@ -47,9 +47,10 @@ export interface StaffInterno {
   id: string | number;
   nome: string;
   funcao: string;
-  salario: number;      // custo mensal
+  salario: number;      // custo mensal (carregado, quando vindo do cadastro de time)
   baseHoras: number;    // base mensal de horas
   horasProjeto: number; // horas previstas no projeto
+  teamMemberId?: string | null; // vínculo com o cadastro global; null = avulso
 }
 
 export interface StaffInternoCalc extends StaffInterno {

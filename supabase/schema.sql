@@ -84,6 +84,9 @@ create table if not exists internal_staff (
   salario numeric(14,2) not null default 0,
   base_horas numeric(8,2) not null default 160,
   horas_projeto numeric(8,2) not null default 0,
+  -- vínculo com o cadastro global de time (nome/função/salário vêm de lá).
+  -- FK adicionada após team_members (definida mais abaixo neste arquivo).
+  team_member_id uuid,
   -- para orçado x realizado no futuro:
   horas_realizadas numeric(8,2)
 );
@@ -130,6 +133,16 @@ create table if not exists team_members (
   -- anexos (metadados; arquivos no Storage bucket team-files)
   anexos jsonb not null default '[]'::jsonb -- [{nome, path, size, tipo, criadoEm}]
 );
+
+-- Vínculo staff↔time: FK definida aqui pois team_members é criada depois de
+-- internal_staff. on delete set null → apagar a pessoa não quebra projetos.
+alter table internal_staff add column if not exists team_member_id uuid;
+do $$ begin
+  alter table internal_staff
+    add constraint internal_staff_team_member_id_fkey
+    foreign key (team_member_id) references team_members(id) on delete set null;
+exception when duplicate_object then null; end $$;
+create index if not exists idx_internal_staff_team_member on internal_staff(team_member_id);
 
 -- updated_at automático
 create or replace function set_updated_at() returns trigger as $$

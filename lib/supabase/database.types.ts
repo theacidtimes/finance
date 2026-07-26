@@ -80,6 +80,7 @@ export type Database = {
           ordem: number
           project_id: string
           salario: number
+          team_member_id: string | null
         }
         Insert: {
           base_horas?: number
@@ -91,6 +92,7 @@ export type Database = {
           ordem?: number
           project_id: string
           salario?: number
+          team_member_id?: string | null
         }
         Update: Partial<Database["public"]["Tables"]["internal_staff"]["Insert"]>
         Relationships: []

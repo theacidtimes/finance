@@ -126,6 +126,7 @@ export function staffRowToInterno(row: StaffRow): StaffInterno {
     salario: num(row.salario),
     baseHoras: num(row.base_horas),
     horasProjeto: num(row.horas_projeto),
+    teamMemberId: row.team_member_id ?? null,
   };
 }
 
@@ -142,6 +143,7 @@ export function internoToStaffInsert(
     salario: s.salario,
     base_horas: s.baseHoras,
     horas_projeto: s.horasProjeto,
+    team_member_id: s.teamMemberId ?? null,
   };
 }
 

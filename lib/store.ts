@@ -8,9 +8,27 @@ import type {
   MarcoCronograma,
   BlocosProposta,
   ProjetoArquivo,
+  TeamMember,
 } from "@/types";
 import { SEED_ATTO } from "@/data/seed";
 import { BLOCOS_PADRAO } from "@/data/blocos";
+import { custoMensalCarregado } from "@/lib/team";
+
+/**
+ * Deriva os campos do staff de projeto a partir de um membro do cadastro.
+ * Opção (B): o "salário" no projeto é o CUSTO MENSAL CARREGADO (salário +
+ * encargos + benefícios) — assim o custo/hora reflete o custo real da pessoa.
+ * Não muda nenhuma fórmula do finance.ts; só define qual número entra.
+ */
+function internoDoMembro(m: TeamMember): Pick<StaffInterno, "nome" | "funcao" | "salario" | "baseHoras" | "teamMemberId"> {
+  return {
+    nome: m.nome,
+    funcao: m.funcao,
+    salario: Math.round(custoMensalCarregado(m) * 100) / 100,
+    baseHoras: m.baseHorasMes,
+    teamMemberId: m.id,
+  };
+}
 
 export interface ProjetoState {
   id?: string;
@@ -27,6 +45,8 @@ export interface ProjetoState {
   removeExterno: (id: CustoExterno["id"]) => void;
 
   addInterno: () => void;
+  addInternoFromMember: (m: TeamMember) => void;
+  resyncInternoFromMember: (id: StaffInterno["id"], m: TeamMember) => void;
   updateInterno: (id: StaffInterno["id"], patch: Partial<StaffInterno>) => void;
   removeInterno: (id: StaffInterno["id"]) => void;
 
@@ -63,7 +83,15 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
 
   addInterno: () =>
     set((s) => ({
-      internos: [...s.internos, { id: Date.now(), nome: "", funcao: "", salario: 0, baseHoras: 160, horasProjeto: 0 }],
+      internos: [...s.internos, { id: Date.now(), nome: "", funcao: "", salario: 0, baseHoras: 160, horasProjeto: 0, teamMemberId: null }],
+    })),
+  addInternoFromMember: (m) =>
+    set((s) => ({
+      internos: [...s.internos, { id: Date.now(), horasProjeto: 0, ...internoDoMembro(m) }],
+    })),
+  resyncInternoFromMember: (id, m) =>
+    set((s) => ({
+      internos: s.internos.map((e) => (e.id === id ? { ...e, ...internoDoMembro(m) } : e)),
     })),
   updateInterno: (id, patch) =>
     set((s) => ({ internos: s.internos.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
