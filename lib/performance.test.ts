@@ -106,6 +106,29 @@ describe("fundo de bônus — break-even da Isa", () => {
   });
 });
 
+describe("configuração real da Isa (markup 140%)", () => {
+  // Cadastro em produção: 100% "Bônus / 13º" + 40% "VR" sobre R$ 6.000.
+  //   carregado 14.400/mês → 90,00/h · caixa 72.000/ano → break-even 800 h
+  const real = (over: Partial<TeamMember> = {}) =>
+    isa({ encargos: [{ label: "Bônus / 13º", pct: 100 }, { label: "VR", pct: 40 }], ...over });
+
+  it("custo/hora = R$ 90,00", () => {
+    const r = computePerformance([projeto(100)], [real()], ANO);
+    expect(r.pessoas[0].custoHora).toBeCloseTo(90, 6);
+  });
+
+  it("break-even = 800 h no ano cheio", () => {
+    const r = computePerformance([projeto(100)], [real()], ANO);
+    expect(r.pessoas[0].breakEvenHoras).toBeCloseTo(800, 6);
+  });
+
+  it("admitida em jul/2026 → meio ano de caixa e break-even pela metade", () => {
+    const r = computePerformance([projeto(100)], [real({ dataAdmissao: "2026-07-15" })], 2026);
+    expect(r.custoCaixaTime).toBeCloseTo(36000, 2); // jul–dez
+    expect(r.pessoas[0].breakEvenHoras).toBeCloseTo(400, 6);
+  });
+});
+
 describe("bônus", () => {
   it("é β do fundo quando o caixa é positivo", () => {
     const r = computePerformance([projeto(1200)], [isa()], ANO);
@@ -166,6 +189,51 @@ describe("custo de caixa", () => {
   it("não cobra caixa de inativo", () => {
     const r = computePerformance([], [isa({ ativo: false })], ANO);
     expect(r.custoCaixaTime).toBe(0);
+  });
+});
+
+describe("sócio não é custo fixo", () => {
+  // Bruno está no cadastro como Sócio com salário mensal de 30k. Esse valor
+  // existe para custear as horas dele nos projetos — a retirada de fato é
+  // distribuição de lucro, variável. Tratar como custo fixo afundaria o caixa.
+  const socio = (): TeamMember =>
+    isa({ id: "socio", nome: "Bruno", tipoContrato: "Sócio", salarioMensal: 30000 });
+
+  it("não vira custo de caixa", () => {
+    const r = computePerformance([], [socio()], ANO);
+    expect(r.custoCaixaTime).toBe(0);
+  });
+
+  it("nem aparece quando não lançou horas", () => {
+    expect(computePerformance([], [socio()], ANO).pessoas).toHaveLength(0);
+  });
+
+  it("aparece sem fundo quando lança horas, com o motivo explicado", () => {
+    const p = projeto(100);
+    p.internos[0].teamMemberId = "socio";
+    p.internos[0].nome = "Bruno";
+    const r = computePerformance([p], [socio()], ANO);
+    expect(r.pessoas[0].temContratoFixo).toBe(false);
+    expect(r.pessoas[0].fundo).toBeNull();
+    expect(r.pessoas[0].motivoSemFundo).toMatch(/sócio/i);
+    expect(r.bonusTotal).toBe(0);
+  });
+
+  it("não afunda o caixa nem bloqueia o bônus de quem tem contrato", () => {
+    const p = projeto(1200); // Isa 1200 h
+    const r = computePerformance([p], [isa(), socio()], ANO);
+    expect(r.custoCaixaTime).toBeCloseTo(72000, 2); // só a Isa
+    expect(r.bonusLiberado).toBe(true);
+    expect(r.bonusTotal).toBeCloseTo(11250, 2);
+  });
+});
+
+describe("freelancer é pago por job, não por mês", () => {
+  it("não gera custo fixo nem fundo", () => {
+    const freela = isa({ id: "fr", nome: "Freela", tipoContrato: "Freelancer" });
+    const r = computePerformance([], [freela], ANO);
+    expect(r.custoCaixaTime).toBe(0);
+    expect(r.pessoas).toHaveLength(0);
   });
 });
 

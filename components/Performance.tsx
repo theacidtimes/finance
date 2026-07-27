@@ -139,7 +139,7 @@ export function Performance({
           <KPI
             label="Resultado de caixa"
             value={formatBRL0(perf.lucroCaixa)}
-            sub="antes das despesas da casa"
+            sub="antes da casa e da sua retirada"
             tone={perf.lucroCaixa >= 0 ? "pos" : "neg"}
           />
           <KPI
@@ -200,17 +200,22 @@ export function Performance({
           {avulsos.length > 0 && (
             <div className="mt-5 pt-4 border-t border-border">
               <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">
-                Sem contrato fixo · não geram fundo
+                Fora do fundo
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {avulsos.map((p) => (
                   <div
                     key={p.teamMemberId ?? p.nome}
-                    className="flex justify-between text-sm tabular-nums"
+                    className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm tabular-nums"
                   >
-                    <span className="text-muted-foreground">{p.nome}</span>
                     <span>
-                      {horas(p.horas)} · {formatBRL0(p.provisao)}
+                      {p.nome}
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {p.motivoSemFundo}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      {horas(p.horas)} · {formatBRL0(p.provisao)} cobrado
                     </span>
                   </div>
                 ))}
@@ -240,7 +245,8 @@ export function Performance({
             Diferença de <b className="text-foreground">{formatBRL0(diferenca)}</b> — provisões que
             nunca saíram do caixa. Este resultado ainda{" "}
             <b className="text-foreground">não desconta</b> as despesas fixas da casa (aluguel,
-            ferramentas, contabilidade), que o sistema não registra.
+            ferramentas, contabilidade), que o sistema não registra, nem a retirada de sócio — é
+            justamente dele que a retirada sai.
           </p>
         </Section>
 

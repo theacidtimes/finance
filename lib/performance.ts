@@ -25,10 +25,30 @@
 
 import { computeDRE } from "./finance";
 import { custoHoraCarregado } from "./team";
-import type { CustoExterno, DREResultado, Projeto, StaffInterno, TeamMember } from "@/types";
+import type {
+  CustoExterno,
+  DREResultado,
+  Projeto,
+  StaffInterno,
+  TeamMember,
+  TipoContrato,
+} from "@/types";
 
 /** Fatia do fundo que vira bônus. O resto fica de colchão na empresa. */
 export const BETA_BONUS = 0.5;
+
+/**
+ * Quem representa compromisso de caixa fixo — e portanto gera fundo e bônus.
+ *
+ * Sócio fica de fora de propósito: a retirada dele é distribuição de lucro,
+ * variável e posterior ao resultado. Tratá-la como custo fixo mensal afundaria
+ * o caixa do ano e criaria um "fundo" negativo sem sentido. O salário no
+ * cadastro do sócio serve para custear as horas dele nos projetos, não para
+ * prever saída de caixa.
+ *
+ * Freelancer também fica de fora: é pago por job, não por mês.
+ */
+export const TIPOS_CUSTO_FIXO: readonly TipoContrato[] = ["CLT", "PJ", "Estágio"];
 
 /** Status que representam trabalho ganho (entra na performance por padrão). */
 export const STATUS_REALIZADO = ["Aprovado", "Em produção", "Entregue"] as const;
@@ -62,6 +82,9 @@ export interface PessoaPerf {
   custoHora: number;
   /** Só existe fundo para quem tem contrato fixo com custo mensal conhecido. */
   temContratoFixo: boolean;
+  tipoContrato: TipoContrato | null;
+  /** Por que a pessoa não gera fundo — para a tela explicar em vez de omitir. */
+  motivoSemFundo: string;
   /** Custo real em caixa no ano (salário mensal × meses ativos). 0 se avulso. */
   custoCaixaAno: number;
   /** provisao − custoCaixaAno. Null quando não há contrato fixo. */
@@ -176,6 +199,7 @@ export function computePerformance(
   // ociosa some da conta e o lucro de caixa fica superestimado.
   for (const m of time) {
     if (!m.ativo || Number(m.salarioMensal) <= 0) continue;
+    if (!TIPOS_CUSTO_FIXO.includes(m.tipoContrato)) continue;
     if (mesesAtivosNoAno(m.dataAdmissao, ano) <= 0) continue;
     acc.set(m.id, { nome: m.nome, id: m.id, horas: 0, provisao: 0 });
   }
@@ -200,8 +224,20 @@ export function computePerformance(
       // Sem `ativo` não há custo de caixa a provisionar. Um inativo que lançou
       // horas no ano ainda aparece na tabela, mas sem fundo — não temos data de
       // desligamento para pro-ratear o caixa dele com honestidade.
+      const custoFixo = !!membro && TIPOS_CUSTO_FIXO.includes(membro.tipoContrato);
       const temContratoFixo =
-        !!membro && membro.ativo && Number(membro.salarioMensal) > 0 && meses > 0;
+        !!membro && custoFixo && membro.ativo && Number(membro.salarioMensal) > 0 && meses > 0;
+
+      let motivoSemFundo = "";
+      if (!temContratoFixo) {
+        if (!membro) motivoSemFundo = "sem vínculo no cadastro de time";
+        else if (membro.tipoContrato === "Sócio")
+          motivoSemFundo = "sócio — retirada sai do resultado, não do fundo";
+        else if (!custoFixo) motivoSemFundo = `${membro.tipoContrato.toLowerCase()} — pago por job`;
+        else if (!membro.ativo) motivoSemFundo = "inativo";
+        else if (Number(membro.salarioMensal) <= 0) motivoSemFundo = "sem custo mensal no cadastro";
+        else motivoSemFundo = "admitido depois deste ano";
+      }
 
       const custoHora = membro ? custoHoraCarregado(membro) : 0;
       const custoCaixaAno = temContratoFixo ? Number(membro!.salarioMensal) * meses : 0;
@@ -220,6 +256,8 @@ export function computePerformance(
         provisao: a.provisao,
         custoHora,
         temContratoFixo,
+        tipoContrato: membro?.tipoContrato ?? null,
+        motivoSemFundo,
         custoCaixaAno,
         fundo,
         breakEvenHoras,
