@@ -70,6 +70,12 @@ export function Performance({
   const comFundo = perf.pessoas.filter((p) => p.temContratoFixo);
   const avulsos = perf.pessoas.filter((p) => !p.temContratoFixo);
 
+  // Horas lançadas sem vínculo com o cadastro de time não têm como virar fundo:
+  // não dá para saber quanto a pessoa custa em caixa. Se houver muitas, o fundo
+  // inteiro lê zero e a tela parece quebrada — então avisamos em vez de calar.
+  const soltas = avulsos.filter((p) => !p.teamMemberId && p.horas > 0);
+  const horasSoltas = soltas.reduce((s, p) => s + p.horas, 0);
+
   return (
     <AppShell userEmail={userEmail}>
       <div className="space-y-6">
@@ -162,6 +168,18 @@ export function Performance({
             acima do que sai do caixa. Esse spread é o fundo. O bônus é{" "}
             {formatPct(BETA_BONUS, 0)} do fundo, liberado só com resultado de caixa positivo.
           </p>
+
+          {horasSoltas > 0 && (
+            <div className="rounded-xl border border-danger/40 bg-danger/5 p-3 mb-4">
+              <p className="text-xs leading-relaxed">
+                <b>{horas(horasSoltas)}</b> em {soltas.length} lançamento(s) sem vínculo com o
+                cadastro de time ({soltas.map((p) => p.nome).join(", ")}). Sem saber a quem essas
+                horas pertencem não dá para saber o custo em caixa — elas{" "}
+                <b>não entram no fundo</b>. Vincule a pessoa em Pessoas &amp; Custos de cada
+                projeto para o fundo refletir a realidade.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
             <KPI
