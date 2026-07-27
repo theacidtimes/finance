@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Users, ShieldCheck, type LucideIcon } from "lucide-react";
+import { LayoutGrid, Users, ShieldCheck, TrendingUp, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePerfil } from "@/components/PerfilProvider";
 
@@ -23,12 +23,21 @@ const NAV: NavItem[] = [
   { href: "/time", label: "Time", icon: Users, match: (p) => p.startsWith("/time") },
 ];
 
-const NAV_MASTER: NavItem = {
-  href: "/usuarios",
-  label: "Usuários",
-  icon: ShieldCheck,
-  match: (p) => p.startsWith("/usuarios"),
-};
+/** Rotas só de master — expõem salários, margens e bônus. */
+const NAV_MASTER: NavItem[] = [
+  {
+    href: "/performance",
+    label: "Performance",
+    icon: TrendingUp,
+    match: (p) => p.startsWith("/performance"),
+  },
+  {
+    href: "/usuarios",
+    label: "Usuários",
+    icon: ShieldCheck,
+    match: (p) => p.startsWith("/usuarios"),
+  },
+];
 
 function Wordmark() {
   return (
@@ -64,7 +73,7 @@ export function AppShell({
 }) {
   const pathname = usePathname() ?? "/";
   const { isMaster } = usePerfil();
-  const navItems = isMaster ? [...NAV, NAV_MASTER] : NAV;
+  const navItems = isMaster ? [...NAV, ...NAV_MASTER] : NAV;
 
   const navLink = (item: NavItem, mobile = false) => {
     const active = item.match(pathname);

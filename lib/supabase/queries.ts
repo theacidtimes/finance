@@ -28,6 +28,7 @@ import {
   clientRowToCliente,
   clienteToClientInsert,
 } from "./mappers";
+import type { ProjetoBruto } from "@/lib/performance";
 
 export type DB = SupabaseClient<Database>;
 
@@ -276,6 +277,77 @@ export async function updateCliente(db: DB, cliente: Cliente): Promise<void> {
 export async function deleteCliente(db: DB, id: string): Promise<void> {
   const { error } = await db.from("clients").delete().eq("id", id);
   if (error) throw error;
+}
+
+/* ================= PERFORMANCE ================= */
+
+/**
+ * Carrega tudo que a tela de performance precisa em 4 queries (não N+1):
+ * projetos + seus custos externos + seu staff, mais o cadastro de time.
+ * O agrupamento e a matemática ficam em lib/performance.ts.
+ */
+export async function listPerformanceDados(db: DB): Promise<{
+  projetos: ProjetoBruto[];
+  time: TeamMember[];
+}> {
+  const [projRes, extRes, staffRes, timeRes] = await Promise.all([
+    db
+      .from("projects")
+      .select(
+        "id, cliente, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, impostos_pct, comissao_pct, overhead_pct"
+      )
+      .order("data", { ascending: false }),
+    db.from("external_costs").select("project_id, valor"),
+    db.from("internal_staff").select("*").order("ordem"),
+    db.from("team_members").select("*"),
+  ]);
+  if (projRes.error) throw projRes.error;
+  if (extRes.error) throw extRes.error;
+  if (staffRes.error) throw staffRes.error;
+  if (timeRes.error) throw timeRes.error;
+
+  const extPorProjeto = new Map<string, { valor: number }[]>();
+  for (const e of extRes.data ?? []) {
+    if (!e.project_id) continue;
+    const arr = extPorProjeto.get(e.project_id) ?? [];
+    arr.push({ valor: Number(e.valor ?? 0) });
+    extPorProjeto.set(e.project_id, arr);
+  }
+
+  const staffPorProjeto = new Map<string, StaffInterno[]>();
+  for (const s of staffRes.data ?? []) {
+    if (!s.project_id) continue;
+    const arr = staffPorProjeto.get(s.project_id) ?? [];
+    arr.push(staffRowToInterno(s));
+    staffPorProjeto.set(s.project_id, arr);
+  }
+
+  const projetos: ProjetoBruto[] = (projRes.data ?? []).map((r) => ({
+    proj: {
+      id: r.id,
+      cliente: r.cliente,
+      projeto: r.projeto,
+      numeroServico: r.numero_servico,
+      tipo: (r.tipo as Projeto["tipo"]) ?? "Filme",
+      responsavel: r.responsavel ?? "",
+      data: r.data ?? "",
+      status: r.status ?? "Orçamento",
+      valorBruto: Number(r.valor_bruto ?? 0),
+      impostosPct: Number(r.impostos_pct ?? 0),
+      comissaoPct: Number(r.comissao_pct ?? 0),
+      overheadPct: Number(r.overhead_pct ?? 0),
+      // campos não usados pelo DRE — preenchidos para satisfazer o tipo
+      prazo: "",
+      condicaoPagamento: "",
+      validadeProposta: "",
+      observacoes: "",
+      titulo: "",
+    },
+    externos: extPorProjeto.get(r.id) ?? [],
+    internos: staffPorProjeto.get(r.id) ?? [],
+  }));
+
+  return { projetos, time: (timeRes.data ?? []).map(teamRowToMember) };
 }
 
 // ---------- PERFIS / USUÁRIOS ----------
