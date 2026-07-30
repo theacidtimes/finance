@@ -206,6 +206,47 @@ describe("custo de caixa", () => {
   });
 });
 
+describe("benefícios saem do caixa; encargos não", () => {
+  // R$ 800/mês de VR/VT: dinheiro que sai de verdade. Se o fundo ignorasse
+  // isso, cobraria dos projetos o carregado (que já inclui o benefício) e
+  // descontaria só o salário — inflando o fundo em 800 × meses.
+  const comBeneficio = (over: Partial<TeamMember> = {}) =>
+    isa({ beneficiosMensais: 800, ...over });
+
+  it("benefício entra no custo de caixa do ano", () => {
+    const r = perf([], [comBeneficio()], ANO);
+    expect(r.custoCaixaTime).toBeCloseTo((6000 + 800) * 12, 2);
+    expect(r.pessoas[0].custoCaixaAno).toBeCloseTo(81600, 2);
+  });
+
+  it("benefício também é pro-rateado por meses decorridos", () => {
+    const r = perf([], [comBeneficio({ dataAdmissao: `${ANO}-07-01` })], ANO);
+    expect(r.custoCaixaTime).toBeCloseTo((6000 + 800) * 6, 2); // jul–dez
+  });
+
+  it("break-even sobe junto: mais caixa a cobrir", () => {
+    // carregado = 6.000 + 110% × 6.000 + 800 = 13.400 → 83,75/h
+    const r = perf([projeto(100)], [comBeneficio()], ANO);
+    expect(r.pessoas[0].custoHora).toBeCloseTo(83.75, 6);
+    expect(r.pessoas[0].breakEvenHoras).toBeCloseTo(81600 / 83.75, 6);
+  });
+
+  it("encargos continuam fora do caixa — é deles que o fundo vive", () => {
+    // Dobrar o encargo não muda um centavo do caixa, só encarece a hora.
+    const a = perf([], [isa({ encargos: [{ label: "Markup", pct: 110 }] })], ANO);
+    const b = perf([], [isa({ encargos: [{ label: "Markup", pct: 220 }] })], ANO);
+    expect(a.custoCaixaTime).toBeCloseTo(b.custoCaixaTime, 6);
+    expect(a.custoCaixaTime).toBeCloseTo(72000, 2);
+  });
+
+  it("a identidade DRE ↔ caixa continua fechando com benefício", () => {
+    const r = perf([projeto(1200)], [comBeneficio()], ANO);
+    expect(
+      r.lucroDRE + r.staffInterno + r.overhead - r.custoCaixaTime
+    ).toBeCloseTo(r.lucroCaixa, 6);
+  });
+});
+
 describe("sócio não é custo fixo", () => {
   // Bruno está no cadastro como Sócio com salário mensal de 30k. Esse valor
   // existe para custear as horas dele nos projetos — a retirada de fato é

@@ -53,6 +53,20 @@ export const TIPOS_CUSTO_FIXO: readonly TipoContrato[] = ["CLT", "PJ", "Estágio
 /** Status que representam trabalho ganho (entra na performance por padrão). */
 export const STATUS_REALIZADO = ["Aprovado", "Em produção", "Entregue"] as const;
 
+/**
+ * Saída de caixa mensal de verdade: salário + benefícios.
+ *
+ * Difere de `custoMensalCarregado` por não somar encargos. Encargos são
+ * markup/provisão embutido no custo/hora cobrado dos projetos — é justamente
+ * esse spread que forma o fundo. Benefício (VR/VT/plano) sai do caixa todo mês,
+ * então tem de ser descontado, senão o fundo fica superestimado.
+ */
+export function custoCaixaMensal(
+  m: Pick<TeamMember, "salarioMensal" | "beneficiosMensais">
+): number {
+  return (Number(m.salarioMensal) || 0) + (Number(m.beneficiosMensais) || 0);
+}
+
 /** Projeto cru vindo do banco, já agrupado com seus filhos. */
 export interface ProjetoBruto {
   proj: Projeto & { id: string };
@@ -270,7 +284,11 @@ export function computePerformance(
       }
 
       const custoHora = membro ? custoHoraCarregado(membro) : 0;
-      const custoCaixaAno = temContratoFixo ? Number(membro!.salarioMensal) * meses : 0;
+      // Caixa = salário + benefícios. Encargos ficam de fora de propósito: são
+      // markup/provisão dentro do custo/hora, não dinheiro que sai todo mês.
+      // Benefício (VR/VT/saúde) sai de verdade, então entra no caixa.
+      const custoCaixaMes = temContratoFixo ? custoCaixaMensal(membro!) : 0;
+      const custoCaixaAno = custoCaixaMes * meses;
       const fundo = temContratoFixo ? a.provisao - custoCaixaAno : null;
       const breakEvenHoras =
         temContratoFixo && custoHora > 0 ? custoCaixaAno / custoHora : null;
