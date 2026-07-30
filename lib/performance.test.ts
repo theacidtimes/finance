@@ -3,7 +3,7 @@ import {
   BETA_BONUS,
   anoDoProjeto,
   computePerformance,
-  mesesAtivosNoAno,
+  mesesDecorridosNoAno,
   type ProjetoBruto,
 } from "./performance";
 import { novoMembroDefaults } from "./team";
@@ -19,6 +19,20 @@ import type { TeamMember } from "@/types";
  * dela é fixo, não por hora.
  */
 const ANO = 2026;
+
+/**
+ * "Hoje" fixo depois do fim de 2026, para que ANO seja um ano FECHADO. Sem
+ * isso os testes dependeriam da data real da máquina: num ano em curso o custo
+ * de caixa só conta os meses decorridos, e os números mudariam com o calendário.
+ */
+const FECHADO = new Date("2027-01-15T00:00:00Z");
+
+const perf = (
+  projetos: ProjetoBruto[],
+  time: TeamMember[],
+  ano: number = ANO,
+  hoje: Date = FECHADO
+) => computePerformance(projetos, time, ano, BETA_BONUS, hoje);
 
 function isa(over: Partial<TeamMember> = {}): TeamMember {
   return {
@@ -84,24 +98,24 @@ describe("fundo de bônus — break-even da Isa", () => {
 
   for (const [h, esperado] of casos) {
     it(`${h} h → fundo ${esperado}`, () => {
-      const r = computePerformance([projeto(h)], [isa()], ANO);
+      const r = perf([projeto(h)], [isa()], ANO);
       expect(r.pessoas[0].fundo).toBeCloseTo(esperado, 2);
     });
   }
 
   it("break-even ≈ 914,29 h", () => {
-    const r = computePerformance([projeto(1000)], [isa()], ANO);
+    const r = perf([projeto(1000)], [isa()], ANO);
     expect(r.pessoas[0].breakEvenHoras).toBeCloseTo(914.2857, 3);
   });
 
   it("no break-even exato o fundo zera", () => {
-    const r = computePerformance([projeto(72000 / 78.75)], [isa()], ANO);
+    const r = perf([projeto(72000 / 78.75)], [isa()], ANO);
     expect(r.pessoas[0].fundo).toBeCloseTo(0, 6);
   });
 
   it("cada hora acima do break-even vale o custo/hora cheio", () => {
-    const a = computePerformance([projeto(1200)], [isa()], ANO).fundoTotal;
-    const b = computePerformance([projeto(1300)], [isa()], ANO).fundoTotal;
+    const a = perf([projeto(1200)], [isa()], ANO).fundoTotal;
+    const b = perf([projeto(1300)], [isa()], ANO).fundoTotal;
     expect(b - a).toBeCloseTo(100 * 78.75, 2);
   });
 });
@@ -113,17 +127,17 @@ describe("configuração real da Isa (markup 140%)", () => {
     isa({ encargos: [{ label: "Bônus / 13º", pct: 100 }, { label: "VR", pct: 40 }], ...over });
 
   it("custo/hora = R$ 90,00", () => {
-    const r = computePerformance([projeto(100)], [real()], ANO);
+    const r = perf([projeto(100)], [real()], ANO);
     expect(r.pessoas[0].custoHora).toBeCloseTo(90, 6);
   });
 
   it("break-even = 800 h no ano cheio", () => {
-    const r = computePerformance([projeto(100)], [real()], ANO);
+    const r = perf([projeto(100)], [real()], ANO);
     expect(r.pessoas[0].breakEvenHoras).toBeCloseTo(800, 6);
   });
 
   it("admitida em jul/2026 → meio ano de caixa e break-even pela metade", () => {
-    const r = computePerformance([projeto(100)], [real({ dataAdmissao: "2026-07-15" })], 2026);
+    const r = perf([projeto(100)], [real({ dataAdmissao: "2026-07-15" })], 2026);
     expect(r.custoCaixaTime).toBeCloseTo(36000, 2); // jul–dez
     expect(r.pessoas[0].breakEvenHoras).toBeCloseTo(400, 6);
   });
@@ -131,14 +145,14 @@ describe("configuração real da Isa (markup 140%)", () => {
 
 describe("bônus", () => {
   it("é β do fundo quando o caixa é positivo", () => {
-    const r = computePerformance([projeto(1200)], [isa()], ANO);
+    const r = perf([projeto(1200)], [isa()], ANO);
     expect(r.bonusLiberado).toBe(true);
     expect(r.bonusTotal).toBeCloseTo(22500 * BETA_BONUS, 2);
     expect(r.bonusTotal).toBeCloseTo(11250, 2);
   });
 
   it("nunca é negativo, mesmo com fundo negativo", () => {
-    const r = computePerformance([projeto(800)], [isa()], ANO);
+    const r = perf([projeto(800)], [isa()], ANO);
     expect(r.fundoTotal).toBeLessThan(0);
     expect(r.bonusTotal).toBe(0);
   });
@@ -146,7 +160,7 @@ describe("bônus", () => {
   it("fica bloqueado quando o caixa do ano é negativo", () => {
     // Receita que não cobre externos + o caixa do time.
     const magro = projeto(1200, { valorBruto: 50000 });
-    const r = computePerformance([magro], [isa()], ANO);
+    const r = perf([magro], [isa()], ANO);
     expect(r.lucroCaixa).toBeLessThan(0);
     expect(r.bonusLiberado).toBe(false);
   });
@@ -156,7 +170,7 @@ describe("bônus", () => {
     const p = projeto(1600);
     p.proj.status = "Entregue";
     // "Outro" tem contrato mas zero horas → fundo −72.000
-    const r = computePerformance([p], [isa(), outro], ANO);
+    const r = perf([p], [isa(), outro], ANO);
     const porNome = Object.fromEntries(r.pessoas.map((x) => [x.nome, x]));
     expect(porNome["Isa"].fundo).toBeCloseTo(54000, 2);
     expect(porNome["Outro"].fundo).toBeCloseTo(-72000, 2);
@@ -168,7 +182,7 @@ describe("bônus", () => {
 
 describe("custo de caixa", () => {
   it("conta o time fixo mesmo sem horas lançadas no ano", () => {
-    const r = computePerformance([], [isa()], ANO);
+    const r = perf([], [isa()], ANO);
     expect(r.custoCaixaTime).toBeCloseTo(72000, 2);
     expect(r.pessoas).toHaveLength(1);
     expect(r.pessoas[0].horas).toBe(0);
@@ -176,18 +190,18 @@ describe("custo de caixa", () => {
   });
 
   it("pro-rateia quem foi admitido no meio do ano", () => {
-    const r = computePerformance([], [isa({ dataAdmissao: `${ANO}-04-15` })], ANO);
+    const r = perf([], [isa({ dataAdmissao: `${ANO}-04-15` })], ANO);
     expect(r.custoCaixaTime).toBeCloseTo(6000 * 9, 2); // abr–dez
   });
 
   it("ignora quem foi admitido depois do ano", () => {
-    const r = computePerformance([], [isa({ dataAdmissao: `${ANO + 1}-01-01` })], ANO);
+    const r = perf([], [isa({ dataAdmissao: `${ANO + 1}-01-01` })], ANO);
     expect(r.custoCaixaTime).toBe(0);
     expect(r.pessoas).toHaveLength(0);
   });
 
   it("não cobra caixa de inativo", () => {
-    const r = computePerformance([], [isa({ ativo: false })], ANO);
+    const r = perf([], [isa({ ativo: false })], ANO);
     expect(r.custoCaixaTime).toBe(0);
   });
 });
@@ -200,19 +214,19 @@ describe("sócio não é custo fixo", () => {
     isa({ id: "socio", nome: "Bruno", tipoContrato: "Sócio", salarioMensal: 30000 });
 
   it("não vira custo de caixa", () => {
-    const r = computePerformance([], [socio()], ANO);
+    const r = perf([], [socio()], ANO);
     expect(r.custoCaixaTime).toBe(0);
   });
 
   it("nem aparece quando não lançou horas", () => {
-    expect(computePerformance([], [socio()], ANO).pessoas).toHaveLength(0);
+    expect(perf([], [socio()], ANO).pessoas).toHaveLength(0);
   });
 
   it("aparece sem fundo quando lança horas, com o motivo explicado", () => {
     const p = projeto(100);
     p.internos[0].teamMemberId = "socio";
     p.internos[0].nome = "Bruno";
-    const r = computePerformance([p], [socio()], ANO);
+    const r = perf([p], [socio()], ANO);
     expect(r.pessoas[0].temContratoFixo).toBe(false);
     expect(r.pessoas[0].fundo).toBeNull();
     expect(r.pessoas[0].motivoSemFundo).toMatch(/sócio/i);
@@ -221,7 +235,7 @@ describe("sócio não é custo fixo", () => {
 
   it("não afunda o caixa nem bloqueia o bônus de quem tem contrato", () => {
     const p = projeto(1200); // Isa 1200 h
-    const r = computePerformance([p], [isa(), socio()], ANO);
+    const r = perf([p], [isa(), socio()], ANO);
     expect(r.custoCaixaTime).toBeCloseTo(72000, 2); // só a Isa
     expect(r.bonusLiberado).toBe(true);
     expect(r.bonusTotal).toBeCloseTo(11250, 2);
@@ -231,7 +245,7 @@ describe("sócio não é custo fixo", () => {
 describe("freelancer é pago por job, não por mês", () => {
   it("não gera custo fixo nem fundo", () => {
     const freela = isa({ id: "fr", nome: "Freela", tipoContrato: "Freelancer" });
-    const r = computePerformance([], [freela], ANO);
+    const r = perf([], [freela], ANO);
     expect(r.custoCaixaTime).toBe(0);
     expect(r.pessoas).toHaveLength(0);
   });
@@ -243,7 +257,7 @@ describe("staff avulso (sem vínculo no cadastro)", () => {
   avulso.internos[0].nome = "Freela";
 
   it("aparece com horas mas não gera fundo", () => {
-    const r = computePerformance([avulso], [], ANO);
+    const r = perf([avulso], [], ANO);
     expect(r.pessoas[0].horas).toBe(1200);
     expect(r.pessoas[0].temContratoFixo).toBe(false);
     expect(r.pessoas[0].fundo).toBeNull();
@@ -251,14 +265,14 @@ describe("staff avulso (sem vínculo no cadastro)", () => {
   });
 
   it("não inventa custo de caixa", () => {
-    const r = computePerformance([avulso], [], ANO);
+    const r = perf([avulso], [], ANO);
     expect(r.custoCaixaTime).toBe(0);
   });
 });
 
 describe("agregação", () => {
   it("reconcilia DRE e caixa pela ponte de provisões", () => {
-    const r = computePerformance([projeto(1200)], [isa()], ANO);
+    const r = perf([projeto(1200)], [isa()], ANO);
     const ponte = r.lucroDRE + r.staffInterno + r.overhead - r.custoCaixaTime;
     expect(ponte).toBeCloseTo(r.lucroCaixa, 6);
   });
@@ -266,7 +280,7 @@ describe("agregação", () => {
   it("soma as horas da mesma pessoa em vários projetos", () => {
     const a = projeto(600);
     const b = { ...projeto(600), proj: { ...projeto(600).proj, id: "p2" } };
-    const r = computePerformance([a, b], [isa()], ANO);
+    const r = perf([a, b], [isa()], ANO);
     expect(r.pessoas[0].horas).toBe(1200);
     expect(r.pessoas[0].fundo).toBeCloseTo(22500, 2);
   });
@@ -279,15 +293,66 @@ describe("agregação", () => {
       externos: [{ valor: 900 }],
       internos: [],
     };
-    const r = computePerformance([grande, pequeno], [isa()], ANO);
+    const r = perf([grande, pequeno], [isa()], ANO);
     expect(r.margemMedia).toBeCloseTo(r.lucroDRE / r.receitaOperacional, 9);
   });
 
   it("ano vazio não quebra", () => {
-    const r = computePerformance([], [], ANO);
+    const r = perf([], [], ANO);
     expect(r.receitaBruta).toBe(0);
     expect(r.margemMedia).toBe(0);
     expect(r.bonusTotal).toBe(0);
+  });
+});
+
+describe("ano em curso só cobra o caixa já decorrido", () => {
+  // O bug que fazia o fundo ficar vermelho mesmo com lucro: cobrar 12 meses de
+  // custo num ano que ainda está correndo compara caixa futuro com trabalho já
+  // feito. O fundo tem de olhar só o que já passou.
+  const JULHO = new Date("2026-07-27T00:00:00Z");
+
+  it("em julho cobra 7 meses, não 12", () => {
+    const r = perf([], [isa()], ANO, JULHO);
+    expect(r.custoCaixaTime).toBeCloseTo(6000 * 7, 2);
+  });
+
+  it("admitida em julho, em julho → 1 mês de caixa", () => {
+    const r = perf([], [isa({ dataAdmissao: "2026-07-15" })], ANO, JULHO);
+    expect(r.custoCaixaTime).toBeCloseTo(6000, 2);
+    expect(r.pessoas[0].mesesCaixa).toBe(1);
+  });
+
+  it("caso real: 360 h da Isa em julho dão fundo POSITIVO", () => {
+    // Era isto que aparecia vermelho: provisão 30.300 contra 36.000 de caixa
+    // (jul–dez, futuro). Cobrando só julho, o fundo fica positivo.
+    const real = isa({
+      dataAdmissao: "2026-07-15",
+      encargos: [{ label: "Bônus / 13º", pct: 100 }, { label: "VR", pct: 40 }],
+    });
+    const p = projeto(360);
+    p.internos[0].salario = 14400; // carregado 140%
+    const r = perf([p], [real], ANO, JULHO);
+    expect(r.pessoas[0].provisao).toBeCloseTo(32400, 2);
+    expect(r.pessoas[0].custoCaixaAno).toBeCloseTo(6000, 2);
+    expect(r.pessoas[0].fundo).toBeGreaterThan(0);
+  });
+
+  it("marca o ano como em curso e conta os meses", () => {
+    const r = perf([], [isa()], ANO, JULHO);
+    expect(r.anoEmCurso).toBe(true);
+    expect(r.mesesDecorridos).toBe(7);
+  });
+
+  it("ano fechado não é 'em curso' e conta 12 meses", () => {
+    const r = perf([], [isa()], ANO, FECHADO);
+    expect(r.anoEmCurso).toBe(false);
+    expect(r.mesesDecorridos).toBe(12);
+  });
+
+  it("ano futuro não cobra nada", () => {
+    const r = perf([], [isa()], 2028, JULHO);
+    expect(r.custoCaixaTime).toBe(0);
+    expect(r.mesesDecorridos).toBe(0);
   });
 });
 
@@ -295,9 +360,9 @@ describe("helpers de data", () => {
   it("anoDoProjeto lê o ano do ISO", () => expect(anoDoProjeto("2026-03-01")).toBe(2026));
   it("anoDoProjeto devolve null sem data", () => expect(anoDoProjeto("")).toBeNull());
   it("anoDoProjeto devolve null com lixo", () => expect(anoDoProjeto("abc")).toBeNull());
-  it("sem admissão assume o ano cheio", () => expect(mesesAtivosNoAno("", 2026)).toBe(12));
+  it("sem admissão assume o ano cheio", () => expect(mesesDecorridosNoAno("", 2026, FECHADO)).toBe(12));
   it("admissão anterior conta 12 meses", () =>
-    expect(mesesAtivosNoAno("2020-05-01", 2026)).toBe(12));
-  it("admissão em janeiro conta 12", () => expect(mesesAtivosNoAno("2026-01-10", 2026)).toBe(12));
-  it("admissão em dezembro conta 1", () => expect(mesesAtivosNoAno("2026-12-31", 2026)).toBe(1));
+    expect(mesesDecorridosNoAno("2020-05-01", 2026, FECHADO)).toBe(12));
+  it("admissão em janeiro conta 12", () => expect(mesesDecorridosNoAno("2026-01-10", 2026, FECHADO)).toBe(12));
+  it("admissão em dezembro conta 1", () => expect(mesesDecorridosNoAno("2026-12-31", 2026, FECHADO)).toBe(1));
 });

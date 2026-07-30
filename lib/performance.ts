@@ -85,7 +85,9 @@ export interface PessoaPerf {
   tipoContrato: TipoContrato | null;
   /** Por que a pessoa não gera fundo — para a tela explicar em vez de omitir. */
   motivoSemFundo: string;
-  /** Custo real em caixa no ano (salário mensal × meses ativos). 0 se avulso. */
+  /** Meses de caixa já decorridos — base do custo e da ocupação. */
+  mesesCaixa: number;
+  /** Custo real em caixa no ano (salário mensal × meses decorridos). 0 se avulso. */
   custoCaixaAno: number;
   /** provisao − custoCaixaAno. Null quando não há contrato fixo. */
   fundo: number | null;
@@ -125,6 +127,10 @@ export interface PerformanceAno {
   bonusTotal: number;
   /** O caixa do ano comporta o bônus? */
   bonusLiberado: boolean;
+  /** O ano ainda está correndo — fundo e bônus são acumulados até hoje. */
+  anoEmCurso: boolean;
+  /** Meses do ano já decorridos (12 se o ano fechou). */
+  mesesDecorridos: number;
 }
 
 /** Ano de um projeto a partir do campo `data` (ISO). Null se sem data válida. */
@@ -136,17 +142,38 @@ export function anoDoProjeto(data: string): number | null {
 }
 
 /**
- * Meses em que a pessoa esteve ativa no ano, para não cobrar 12 meses de
- * caixa de quem entrou em setembro.
+ * Meses de caixa DECORRIDOS da pessoa dentro do ano.
+ *
+ * Conta da admissão (ou de janeiro, se ela já estava na casa) até hoje — nunca
+ * até dezembro de um ano que ainda não terminou. É a correção mais importante
+ * deste módulo: cobrar o ano inteiro num ano em curso compara custo que ainda
+ * não aconteceu com trabalho já entregue, e o fundo fica negativo por
+ * construção, não por performance.
+ *
+ * Ano fechado no passado → 12 meses (ou desde a admissão).
+ * Ano futuro → 0.
  */
-export function mesesAtivosNoAno(dataAdmissao: string, ano: number): number {
-  if (!dataAdmissao) return 12;
-  const d = new Date(dataAdmissao);
-  if (Number.isNaN(d.getTime())) return 12;
-  const y = d.getUTCFullYear();
-  if (y > ano) return 0;
-  if (y < ano) return 12;
-  return 12 - d.getUTCMonth();
+export function mesesDecorridosNoAno(
+  dataAdmissao: string,
+  ano: number,
+  hoje: Date = new Date()
+): number {
+  const anoHoje = hoje.getUTCFullYear();
+  if (ano > anoHoje) return 0;
+  // Último mês a cobrar: dezembro se o ano já fechou, senão o mês corrente.
+  const mesFim = ano < anoHoje ? 11 : hoje.getUTCMonth();
+
+  let mesInicio = 0;
+  if (dataAdmissao) {
+    const d = new Date(dataAdmissao);
+    if (!Number.isNaN(d.getTime())) {
+      const y = d.getUTCFullYear();
+      if (y > ano) return 0;
+      if (y === ano) mesInicio = d.getUTCMonth();
+    }
+  }
+
+  return Math.max(0, mesFim - mesInicio + 1);
 }
 
 /**
@@ -154,13 +181,16 @@ export function mesesAtivosNoAno(dataAdmissao: string, ano: number): number {
  *
  * @param projetos  projetos já filtrados por ano e por status
  * @param time      cadastro global (para saber o custo real de cada pessoa)
- * @param ano       ano de referência (usado para pro-ratear admissões)
+ * @param ano       ano de referência
+ * @param beta      fatia do fundo que vira bônus
+ * @param hoje      injetável para teste; limita o caixa ao já decorrido
  */
 export function computePerformance(
   projetos: ProjetoBruto[],
   time: TeamMember[],
   ano: number,
-  beta: number = BETA_BONUS
+  beta: number = BETA_BONUS,
+  hoje: Date = new Date()
 ): PerformanceAno {
   const perf: ProjetoPerf[] = projetos.map((p) => ({
     id: p.proj.id,
@@ -200,7 +230,7 @@ export function computePerformance(
   for (const m of time) {
     if (!m.ativo || Number(m.salarioMensal) <= 0) continue;
     if (!TIPOS_CUSTO_FIXO.includes(m.tipoContrato)) continue;
-    if (mesesAtivosNoAno(m.dataAdmissao, ano) <= 0) continue;
+    if (mesesDecorridosNoAno(m.dataAdmissao, ano, hoje) <= 0) continue;
     acc.set(m.id, { nome: m.nome, id: m.id, horas: 0, provisao: 0 });
   }
 
@@ -220,7 +250,7 @@ export function computePerformance(
   const pessoas: PessoaPerf[] = [...acc.values()]
     .map((a): PessoaPerf => {
       const membro = a.id ? porId.get(a.id) : undefined;
-      const meses = membro ? mesesAtivosNoAno(membro.dataAdmissao, ano) : 0;
+      const meses = membro ? mesesDecorridosNoAno(membro.dataAdmissao, ano, hoje) : 0;
       // Sem `ativo` não há custo de caixa a provisionar. Um inativo que lançou
       // horas no ano ainda aparece na tabela, mas sem fundo — não temos data de
       // desligamento para pro-ratear o caixa dele com honestidade.
@@ -258,6 +288,7 @@ export function computePerformance(
         temContratoFixo,
         tipoContrato: membro?.tipoContrato ?? null,
         motivoSemFundo,
+        mesesCaixa: temContratoFixo ? meses : 0,
         custoCaixaAno,
         fundo,
         breakEvenHoras,
@@ -288,5 +319,7 @@ export function computePerformance(
     fundoTotal,
     bonusTotal,
     bonusLiberado: lucroCaixa > 0,
+    anoEmCurso: ano === hoje.getUTCFullYear(),
+    mesesDecorridos: mesesDecorridosNoAno("", ano, hoje),
   };
 }

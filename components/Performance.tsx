@@ -85,6 +85,11 @@ export function Performance({
             <h1 className="font-heading text-2xl font-semibold tracking-tight">Performance</h1>
             <p className="text-sm text-muted-foreground mt-1 tabular-nums">
               {perf.projetos.length} projeto(s) em {ano}
+              {perf.anoEmCurso
+                ? ` · ano em curso, ${perf.mesesDecorridos} ${
+                    perf.mesesDecorridos === 1 ? "mês" : "meses"
+                  } decorrido(s)`
+                : " · ano fechado"}
               {semData > 0 && ` · ${semData} sem data (fora da conta)`}
             </p>
           </div>
@@ -167,6 +172,17 @@ export function Performance({
             Os projetos são cobrados pelo custo/hora <b className="text-foreground">carregado</b>,
             acima do que sai do caixa. Esse spread é o fundo. O bônus é{" "}
             {formatPct(BETA_BONUS, 0)} do fundo, liberado só com resultado de caixa positivo.
+            {perf.anoEmCurso && (
+              <>
+                {" "}
+                Como {ano} não terminou, o custo de caixa conta só os{" "}
+                <b className="text-foreground">
+                  {perf.mesesDecorridos} {perf.mesesDecorridos === 1 ? "mês" : "meses"}
+                </b>{" "}
+                já decorridos — é um fundo <b className="text-foreground">acumulado até hoje</b>,
+                não a projeção do ano fechado.
+              </>
+            )}
           </p>
 
           {horasSoltas > 0 && (
@@ -183,12 +199,13 @@ export function Performance({
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
             <KPI
-              label="Fundo do ano"
+              label={perf.anoEmCurso ? "Fundo até agora" : "Fundo do ano"}
               value={formatBRL0(perf.fundoTotal)}
+              sub={perf.anoEmCurso ? `${perf.mesesDecorridos}/12 meses` : undefined}
               tone={perf.fundoTotal >= 0 ? "pos" : "neg"}
             />
             <KPI
-              label="Bônus a distribuir"
+              label={perf.anoEmCurso ? "Bônus acumulado" : "Bônus a distribuir"}
               value={formatBRL0(perf.bonusLiberado ? perf.bonusTotal : 0)}
               sub={
                 perf.bonusLiberado
@@ -390,7 +407,8 @@ function PessoaCard({ p, liberado }: { p: PessoaPerf; liberado: boolean }) {
 
       <div className="text-[11px] text-muted-foreground mt-3 pt-2 border-t border-border">
         Cobrado nos projetos {formatBRL0(p.provisao)} · custo em caixa{" "}
-        {formatBRL0(p.custoCaixaAno)}
+        {formatBRL0(p.custoCaixaAno)} ({p.mesesCaixa}{" "}
+        {p.mesesCaixa === 1 ? "mês" : "meses"})
       </div>
     </div>
   );
