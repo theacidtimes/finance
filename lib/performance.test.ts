@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  ALPHA_POOL,
   BETA_BONUS,
   anoDoProjeto,
   computePerformance,
@@ -203,6 +204,88 @@ describe("custo de caixa", () => {
   it("não cobra caixa de inativo", () => {
     const r = perf([], [isa({ ativo: false })], ANO);
     expect(r.custoCaixaTime).toBe(0);
+  });
+});
+
+describe("teto do pool: o fundo não pode prometer mais do que o lucro comporta", () => {
+  /**
+   * O fundo mede spread de horas e nunca pergunta se o cliente pagou o
+   * suficiente. Então dá para ter fundo grande e lucro pequeno ao mesmo tempo:
+   * muitas horas internas em projeto vendido barato. Sem teto, o bônus
+   * prometeria dinheiro que não existe.
+   *
+   * Cenário: 2.000 h da Isa (fundo R$ 85.500 → direito de R$ 42.750) num
+   * projeto de R$ 220.000 que sobra só R$ 17.926 de caixa no ano.
+   */
+  const apertado = () => perf([projeto(2000, { valorBruto: 220000 })], [isa()], ANO);
+
+  it("o direito bruto pelo fundo supera em muito o caixa do ano", () => {
+    const r = apertado();
+    expect(r.fundoTotal).toBeCloseTo(85500, 2);
+    expect(r.bonusPeloFundo).toBeCloseTo(42750, 2);
+    expect(r.lucroCaixa).toBeCloseTo(17926, 2);
+    // 42.750 de bônus sobre 17.926 de caixa: pagaria 2,4× o que sobrou.
+    expect(r.bonusPeloFundo).toBeGreaterThan(r.lucroCaixa);
+  });
+
+  it("o bônus efetivo fica limitado a α do resultado de caixa", () => {
+    const r = apertado();
+    expect(r.poolTeto).toBeCloseTo(17926 * ALPHA_POOL, 2);
+    expect(r.bonusTotal).toBeCloseTo(3585.2, 2);
+    expect(r.fatorRateio).toBeCloseTo(3585.2 / 42750, 6);
+  });
+
+  it("bônus nunca passa de α × lucro nem de β × fundo — vale o menor", () => {
+    for (const vb of [220000, 300000, 500000, 900000]) {
+      const r = perf([projeto(2000, { valorBruto: vb })], [isa()], ANO);
+      expect(r.bonusTotal).toBeLessThanOrEqual(r.poolTeto + 1e-6);
+      expect(r.bonusTotal).toBeLessThanOrEqual(r.bonusPeloFundo + 1e-6);
+      expect(r.bonusTotal).toBeCloseTo(Math.min(r.poolTeto, r.bonusPeloFundo), 6);
+    }
+  });
+
+  it("quando o fundo cabe no pool, nada é rateado", () => {
+    const r = perf([projeto(1200)], [isa()], ANO); // projeto de 500k, caixa gordo
+    expect(r.fatorRateio).toBe(1);
+    expect(r.bonusTotal).toBeCloseTo(r.bonusPeloFundo, 6);
+    expect(r.bonusTotal).toBeCloseTo(11250, 2);
+  });
+
+  it("o rateio preserva a proporção entre as pessoas", () => {
+    // Duas pessoas com fundos diferentes, num ano de caixa apertado.
+    const p = projeto(2000, { valorBruto: 400000 });
+    p.internos.push({
+      id: 2,
+      nome: "Duo",
+      funcao: "Designer",
+      salario: 12600,
+      baseHoras: 160,
+      horasProjeto: 1000,
+      teamMemberId: "duo",
+    });
+    const r = perf([p], [isa(), isa({ id: "duo", nome: "Duo" })], ANO);
+    expect(r.fatorRateio).toBeLessThan(1);
+    const [a, b] = r.pessoas;
+    // razão dos bônus = razão dos fundos
+    expect(a.bonus / b.bonus).toBeCloseTo(a.fundo! / b.fundo!, 6);
+    expect(r.bonusTotal).toBeCloseTo(r.poolTeto, 6);
+  });
+
+  it("caixa negativo zera o pool e o bônus", () => {
+    const r = perf([projeto(2000, { valorBruto: 50000 })], [isa()], ANO);
+    expect(r.lucroCaixa).toBeLessThan(0);
+    expect(r.poolTeto).toBe(0);
+    expect(r.bonusTotal).toBe(0);
+    expect(r.bonusLiberado).toBe(false);
+    // mas o direito pelo fundo continua visível, para a tela poder explicar
+    expect(r.bonusPeloFundo).toBeGreaterThan(0);
+  });
+
+  it("dados reais de 2026: o teto não aperta (bônus é ~3% do caixa)", () => {
+    // Σβ·fundo = 12.150 contra pool de 20% × 403.318 = 80.663 → fator 1.
+    const r = perf([projeto(1200)], [isa()], ANO);
+    expect(r.bonusPeloFundo).toBeLessThan(r.poolTeto);
+    expect(r.fatorRateio).toBe(1);
   });
 });
 

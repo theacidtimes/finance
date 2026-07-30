@@ -38,6 +38,23 @@ import type {
 export const BETA_BONUS = 0.5;
 
 /**
+ * Teto do pool de bônus como % do resultado de caixa do ano (α).
+ *
+ * Por que existe: o fundo mede *spread de horas*, não dinheiro disponível. Ele
+ * compara o que os DREs cobraram pelas horas de alguém com o que essa pessoa
+ * custou em caixa — e nada nessa conta pergunta se o cliente pagou o suficiente.
+ * Dá para ter fundo grande e lucro pequeno ao mesmo tempo (muitas horas internas
+ * em projetos vendidos baratos), e aí o fundo prometeria mais do que existe.
+ *
+ * Então o fundo decide *quem recebe quanto* (é boa medida de mérito/ocupação) e
+ * o lucro decide *o tamanho do bolo* (é o único dinheiro que existe de verdade).
+ *
+ * Atenção à base: `lucroCaixa` é ANTES das despesas fixas da casa e da retirada
+ * do sócio, que o sistema não registra. Por isso α tem de deixar folga para elas.
+ */
+export const ALPHA_POOL = 0.2;
+
+/**
  * Quem representa compromisso de caixa fixo — e portanto gera fundo e bônus.
  *
  * Sócio fica de fora de propósito: a retirada dele é distribuição de lucro,
@@ -109,6 +126,9 @@ export interface PessoaPerf {
   breakEvenHoras: number | null;
   /** horas / (baseHorasMes × meses ativos). Null quando não há base. */
   ocupacao: number | null;
+  /** β × fundo — o direito bruto, antes do teto coletivo sobre o lucro. */
+  bonusPeloFundo: number;
+  /** Bônus efetivo: `bonusPeloFundo` já rateado pelo teto do pool. */
   bonus: number;
 }
 
@@ -137,7 +157,13 @@ export interface PerformanceAno {
   pessoas: PessoaPerf[];
   /** Σ dos fundos individuais (pode ser negativo — é informativo). */
   fundoTotal: number;
-  /** Σ dos bônus individuais, já com o piso em zero por pessoa. */
+  /** Σ β × fundo⁺ — o que os fundos pediriam sem teto de lucro. */
+  bonusPeloFundo: number;
+  /** α × max(0, lucroCaixa) — o máximo que o resultado do ano comporta. */
+  poolTeto: number;
+  /** 1 quando o fundo cabe no pool; < 1 quando o lucro obrigou a ratear. */
+  fatorRateio: number;
+  /** Σ dos bônus efetivos = min(bonusPeloFundo, poolTeto). */
   bonusTotal: number;
   /** O caixa do ano comporta o bônus? */
   bonusLiberado: boolean;
@@ -204,7 +230,8 @@ export function computePerformance(
   time: TeamMember[],
   ano: number,
   beta: number = BETA_BONUS,
-  hoje: Date = new Date()
+  hoje: Date = new Date(),
+  alpha: number = ALPHA_POOL
 ): PerformanceAno {
   const perf: ProjetoPerf[] = projetos.map((p) => ({
     id: p.proj.id,
@@ -311,7 +338,10 @@ export function computePerformance(
         fundo,
         breakEvenHoras,
         ocupacao,
-        bonus: fundo !== null && fundo > 0 ? fundo * beta : 0,
+        // Direito bruto pelo fundo. O rateio pelo teto do pool vem depois, já
+        // que depende do resultado de caixa do ano inteiro.
+        bonusPeloFundo: fundo !== null && fundo > 0 ? fundo * beta : 0,
+        bonus: 0,
       };
     })
     .sort((a, b) => b.horas - a.horas);
@@ -319,6 +349,17 @@ export function computePerformance(
   const custoCaixaTime = pessoas.reduce((s, p) => s + p.custoCaixaAno, 0);
   const lucroCaixa = receitaOperacional - custosExternos - custoCaixaTime;
   const fundoTotal = pessoas.reduce((s, p) => s + (p.fundo ?? 0), 0);
+
+  // Dois tetos independentes, e vale o menor:
+  //   individual — ninguém leva mais que β do próprio fundo;
+  //   coletivo   — a soma não passa de α do resultado de caixa.
+  // Quando o coletivo aperta, rateia proporcional ao fundo de cada um, o que
+  // preserva o mérito relativo sem inventar dinheiro que não existe.
+  const bonusPeloFundo = pessoas.reduce((s, p) => s + p.bonusPeloFundo, 0);
+  const poolTeto = Math.max(0, lucroCaixa) * alpha;
+  const fatorRateio =
+    bonusPeloFundo > poolTeto && bonusPeloFundo > 0 ? poolTeto / bonusPeloFundo : 1;
+  for (const p of pessoas) p.bonus = p.bonusPeloFundo * fatorRateio;
   const bonusTotal = pessoas.reduce((s, p) => s + p.bonus, 0);
 
   return {
@@ -335,6 +376,9 @@ export function computePerformance(
     margemMedia: receitaOperacional > 0 ? lucroDRE / receitaOperacional : 0,
     pessoas,
     fundoTotal,
+    bonusPeloFundo,
+    poolTeto,
+    fatorRateio,
     bonusTotal,
     bonusLiberado: lucroCaixa > 0,
     anoEmCurso: ano === hoje.getUTCFullYear(),

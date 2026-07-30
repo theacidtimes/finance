@@ -7,6 +7,7 @@ import { Section, KPI } from "@/components/ui/primitives";
 import { formatBRL0, formatPct } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import {
+  ALPHA_POOL,
   BETA_BONUS,
   STATUS_REALIZADO,
   anoDoProjeto,
@@ -165,13 +166,21 @@ export function Performance({
         <Section
           title="Fundo de bônus"
           right={
-            <span className="text-[11px] text-muted-foreground">β = {formatPct(BETA_BONUS, 0)}</span>
+            <span className="text-[11px] text-muted-foreground">
+              β = {formatPct(BETA_BONUS, 0)} · teto α = {formatPct(ALPHA_POOL, 0)} do caixa
+            </span>
           }
         >
           <p className="text-xs text-muted-foreground leading-relaxed mb-4">
             Os projetos são cobrados pelo custo/hora <b className="text-foreground">carregado</b>,
-            acima do que sai do caixa. Esse spread é o fundo. O bônus é{" "}
-            {formatPct(BETA_BONUS, 0)} do fundo, liberado só com resultado de caixa positivo.
+            acima do que sai do caixa. Esse spread é o fundo, e ele decide{" "}
+            <b className="text-foreground">quem recebe quanto</b>. O tamanho do bolo, porém, vem do
+            lucro: o bônus é {formatPct(BETA_BONUS, 0)} do fundo,{" "}
+            <b className="text-foreground">
+              limitado a {formatPct(ALPHA_POOL, 0)} do resultado de caixa
+            </b>{" "}
+            — o fundo mede ocupação, não dinheiro disponível, então sozinho ele poderia prometer mais
+            do que existe.
             {perf.anoEmCurso && (
               <>
                 {" "}
@@ -219,6 +228,19 @@ export function Performance({
               value={formatBRL0(Math.max(0, perf.fundoTotal) - perf.bonusTotal)}
             />
           </div>
+
+          {perf.fatorRateio < 1 && perf.bonusLiberado && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 mb-5">
+              <p className="text-xs leading-relaxed">
+                Os fundos dariam direito a <b>{formatBRL0(perf.bonusPeloFundo)}</b>, mas{" "}
+                {formatPct(ALPHA_POOL, 0)} do resultado de caixa são{" "}
+                <b>{formatBRL0(perf.poolTeto)}</b>. O bônus foi rateado a{" "}
+                <b>{formatPct(perf.fatorRateio, 0)}</b> do direito de cada um, mantendo a proporção
+                entre as pessoas. Muita hora interna em projeto vendido barato produz exatamente
+                isso: fundo alto com lucro baixo.
+              </p>
+            </div>
+          )}
 
           {comFundo.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -356,6 +378,8 @@ function Linha({ label, valor }: { label: string; valor: number }) {
 function PessoaCard({ p, liberado }: { p: PessoaPerf; liberado: boolean }) {
   const be = p.breakEvenHoras ?? 0;
   const fundo = p.fundo ?? 0;
+  // O teto de lucro cortou o direito bruto desta pessoa?
+  const rateado = p.bonusPeloFundo - p.bonus > 0.01;
   // Barra: horas trabalhadas contra o break-even. Passou do break-even, sobra fundo.
   const escala = Math.max(be, p.horas, 1);
   const pctHoras = (p.horas / escala) * 100;
@@ -401,7 +425,13 @@ function PessoaCard({ p, liberado }: { p: PessoaPerf; liberado: boolean }) {
         <Dado
           label="Bônus"
           valor={formatBRL0(liberado ? p.bonus : 0)}
-          hint={liberado ? undefined : "bloqueado"}
+          hint={
+            !liberado
+              ? "bloqueado"
+              : rateado
+                ? `de ${formatBRL0(p.bonusPeloFundo)}`
+                : undefined
+          }
         />
       </div>
 
@@ -409,6 +439,7 @@ function PessoaCard({ p, liberado }: { p: PessoaPerf; liberado: boolean }) {
         Cobrado nos projetos {formatBRL0(p.provisao)} · custo em caixa{" "}
         {formatBRL0(p.custoCaixaAno)} ({p.mesesCaixa}{" "}
         {p.mesesCaixa === 1 ? "mês" : "meses"})
+        {rateado && " · bônus rateado pelo teto de lucro"}
       </div>
     </div>
   );
