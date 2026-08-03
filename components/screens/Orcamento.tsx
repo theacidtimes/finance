@@ -399,7 +399,11 @@ export function Orcamento() {
 
         <Bloco b={B.cronograma} editando={editando}>
           <div className="space-y-1.5">
-            {cronograma.map((m, i) => (
+            {/* Editando, toda linha aparece (inclusive a recém-criada, vazia).
+                Na visualização, marco em branco some — é o que o PDF faz. */}
+            {cronograma.map((m, i) => {
+              if (!editando && !m.data.trim() && !m.marco.trim()) return null;
+              return (
               <div key={i} className="flex gap-2 items-center text-sm">
                 {editando ? (
                   <>
@@ -414,7 +418,8 @@ export function Orcamento() {
                   </>
                 )}
               </div>
-            ))}
+              );
+            })}
             {editando && (
               <button onClick={addMarco} className="text-xs mt-2 px-2 py-1 rounded border border-input hover:bg-muted">
                 + marco

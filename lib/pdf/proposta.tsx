@@ -188,12 +188,15 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
         </Block>
 
         <Block b={B.cronograma}>
-          {cronograma.map((m, i) => (
-            <View key={i} style={s.cronoRow}>
-              <Text style={s.cronoData}>{m.data}</Text>
-              <Text style={s.cronoMarco}>{m.marco}</Text>
-            </View>
-          ))}
+          {/* Marco em branco é linha que o usuário abriu e não preencheu — não vai para o cliente. */}
+          {cronograma
+            .filter((m) => m.data.trim() || m.marco.trim())
+            .map((m, i) => (
+              <View key={i} style={s.cronoRow}>
+                <Text style={s.cronoData}>{m.data}</Text>
+                <Text style={s.cronoMarco}>{m.marco}</Text>
+              </View>
+            ))}
         </Block>
 
         <Block b={B.exclusoes}>
