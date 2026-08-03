@@ -36,6 +36,8 @@ export function projectRowToProjeto(row: ProjectRow): Projeto {
     id: row.id,
     cliente: row.cliente,
     clienteId: row.client_id ?? null,
+    marca: row.marca ?? "",
+    contato: row.contato ?? "",
     projeto: row.projeto,
     numeroServico: row.numero_servico,
     tipo: (row.tipo as TipoProjeto) ?? "Filme",
@@ -60,6 +62,8 @@ export function projetoToProjectInsert(proj: Projeto): ProjectInsert {
   return {
     cliente: proj.cliente,
     client_id: proj.clienteId ?? null,
+    marca: proj.marca ?? "",
+    contato: proj.contato ?? "",
     projeto: proj.projeto,
     numero_servico: proj.numeroServico,
     tipo: proj.tipo,

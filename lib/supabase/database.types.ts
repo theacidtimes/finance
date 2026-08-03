@@ -218,6 +218,7 @@ export type Database = {
           blocos: Json
           cliente: string
           client_id: string | null
+          contato: string | null
           comissao_pct: number
           condicao_pagamento: string | null
           created_at: string
@@ -225,6 +226,7 @@ export type Database = {
           data: string | null
           id: string
           impostos_pct: number
+          marca: string | null
           numero_servico: string
           observacoes: string | null
           overhead_pct: number
@@ -244,6 +246,7 @@ export type Database = {
           blocos?: Json
           cliente: string
           client_id?: string | null
+          contato?: string | null
           comissao_pct?: number
           condicao_pagamento?: string | null
           created_at?: string
@@ -251,6 +254,7 @@ export type Database = {
           data?: string | null
           id?: string
           impostos_pct?: number
+          marca?: string | null
           numero_servico: string
           observacoes?: string | null
           overhead_pct?: number

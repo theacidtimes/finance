@@ -14,7 +14,23 @@ export function Cadastro() {
   return (
     <Section title="Cadastro do projeto">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Field label="Cliente"><TextInput value={proj.cliente} onChange={(v) => setP("cliente", v)} /></Field>
+        <Field label="Cliente" hint="quem contrata e paga — a agência, se houver">
+          <TextInput value={proj.cliente} onChange={(v) => setP("cliente", v)} />
+        </Field>
+        <Field label="Marca" hint="cliente final; deixe vazio se for o próprio cliente">
+          <TextInput
+            value={proj.marca ?? ""}
+            onChange={(v) => setP("marca", v)}
+            placeholder={proj.cliente || "Vivo, Santander…"}
+          />
+        </Field>
+        <Field label="Contato" hint="quem pediu o orçamento; sai no cabeçalho da proposta">
+          <TextInput
+            value={proj.contato ?? ""}
+            onChange={(v) => setP("contato", v)}
+            placeholder="Nome da pessoa"
+          />
+        </Field>
         <Field label="Projeto"><TextInput value={proj.projeto} onChange={(v) => setP("projeto", v)} /></Field>
         <Field label="Nº de Serviço"><TextInput value={proj.numeroServico} onChange={(v) => setP("numeroServico", v)} /></Field>
         <Field label="Tipo">

@@ -150,10 +150,24 @@ export function Select({
   );
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  /** Explicação curta abaixo do rótulo, para campo cujo nome não basta. */
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
       <span className="text-[11px] tracking-widest uppercase text-muted-foreground">{label}</span>
+      {hint && (
+        <span className="block text-[11px] leading-tight text-muted-foreground/70 mt-0.5">
+          {hint}
+        </span>
+      )}
       <div className="mt-1">{children}</div>
     </label>
   );

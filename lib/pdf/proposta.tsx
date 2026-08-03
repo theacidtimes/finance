@@ -11,6 +11,7 @@ import {
 import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
 import { formatBRL0 } from "@/utils/format";
 import { TEXTOS_MESTRE } from "@/data/catalogo";
+import { metaProposta, destinatario } from "@/lib/proposta";
 
 const INK = "#111111";
 const MUTED = "#6B7280";
@@ -140,22 +141,12 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
           <Text style={s.company}>THE ACID TIMES LTDA</Text>
           <Text style={s.cnpj}>CNPJ: 36.458.402/0001-81</Text>
           <View style={s.metaGrid}>
-            <Text style={s.metaItem}>
-              <Text style={s.metaLabel}>Data: </Text>
-              {proj.data}
-            </Text>
-            <Text style={s.metaItem}>
-              <Text style={s.metaLabel}>Cliente: </Text>
-              {proj.cliente}
-            </Text>
-            <Text style={s.metaItem}>
-              <Text style={s.metaLabel}>Projeto: </Text>
-              {proj.projeto} ({proj.numeroServico})
-            </Text>
-            <Text style={s.metaItem}>
-              <Text style={s.metaLabel}>Validade: </Text>
-              {proj.validadeProposta}
-            </Text>
+            {metaProposta(proj).map((m) => (
+              <Text key={m.rotulo} style={s.metaItem}>
+                <Text style={s.metaLabel}>{m.rotulo}: </Text>
+                {m.valor}
+              </Text>
+            ))}
           </View>
           {proj.roteiroUrl && proj.roteiroUrl.trim() ? (
             <Text style={s.roteiroRow}>
@@ -171,7 +162,7 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
 
         <Block n="1" titulo="Projeto">
           <Text style={s.body}>
-            {proj.projeto} — {proj.tipo} para {proj.cliente}.
+            {proj.projeto} — {proj.tipo} para {destinatario(proj)}.
           </Text>
         </Block>
         <Block n="2" titulo="O serviço inclui">

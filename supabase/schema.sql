@@ -25,8 +25,13 @@ create table if not exists projects (
   updated_at timestamptz not null default now(),
   created_by uuid references auth.users(id),
 
+  -- quem contrata e paga a ACID — muitas vezes uma agência
   cliente text not null,
   client_id uuid references clients(id) on delete set null,
+  -- marca / cliente final. Vazio = o cliente é a própria marca
+  marca text default '',
+  -- pessoa que pediu o orçamento; vai fixa no cabeçalho da proposta
+  contato text default '',
   projeto text not null,
   numero_servico text not null,
   tipo text not null default 'Filme',

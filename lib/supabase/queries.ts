@@ -35,6 +35,8 @@ export type DB = SupabaseClient<Database>;
 export interface ProjetoResumo {
   id: string;
   cliente: string;
+  /** Marca / cliente final — vazio quando o cliente já é a marca. */
+  marca: string;
   projeto: string;
   numeroServico: string;
   tipo: string;
@@ -58,13 +60,14 @@ export async function listProjects(db: DB): Promise<ProjetoResumo[]> {
   const { data, error } = await db
     .from("projects")
     .select(
-      "id, cliente, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, updated_at"
+      "id, cliente, marca, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, updated_at"
     )
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r) => ({
     id: r.id,
     cliente: r.cliente,
+    marca: r.marca ?? "",
     projeto: r.projeto,
     numeroServico: r.numero_servico,
     tipo: r.tipo,
@@ -80,7 +83,7 @@ export async function listProjectsByClient(db: DB, clientId: string): Promise<Pr
   const { data, error } = await db
     .from("projects")
     .select(
-      "id, cliente, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, updated_at"
+      "id, cliente, marca, projeto, numero_servico, tipo, responsavel, data, status, valor_bruto, updated_at"
     )
     .eq("client_id", clientId)
     .order("updated_at", { ascending: false });
@@ -88,6 +91,7 @@ export async function listProjectsByClient(db: DB, clientId: string): Promise<Pr
   return (data ?? []).map((r) => ({
     id: r.id,
     cliente: r.cliente,
+    marca: r.marca ?? "",
     projeto: r.projeto,
     numeroServico: r.numero_servico,
     tipo: r.tipo,

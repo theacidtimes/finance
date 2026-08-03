@@ -10,8 +10,13 @@ export type CategoriaExterna =
 
 export interface Projeto {
   id?: string;
+  /** Quem contrata e paga a ACID — muitas vezes uma agência. */
   cliente: string;
   clienteId?: string | null; // FK para a entidade Cliente (agrupamento)
+  /** Marca / cliente final. Vazio quando o cliente já é a própria marca. */
+  marca?: string;
+  /** Pessoa que pediu o orçamento. Vai fixa no cabeçalho da proposta. */
+  contato?: string;
   projeto: string;
   numeroServico: string;
   tipo: TipoProjeto;

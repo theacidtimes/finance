@@ -62,6 +62,8 @@ export function projetoToCsv(
 
   line("ACID Finance — Projeto");
   line("Cliente", proj.cliente);
+  if (proj.marca?.trim()) line("Marca", proj.marca);
+  if (proj.contato?.trim()) line("Contato", proj.contato);
   line("Projeto", proj.projeto);
   line("Nº serviço", proj.numeroServico);
   line("Tipo", proj.tipo);

@@ -217,7 +217,17 @@ export function ClienteDetalhe({
                       onClick={() => router.push(`/projetos/${p.id}`)}
                       className="border-t border-border hover:bg-muted/40 cursor-pointer"
                     >
-                      <td className="px-4 py-3 font-medium">{p.projeto}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {p.projeto}
+                        {/* Marca só quando difere do cliente — repetir o mesmo
+                            nome duas vezes não informa nada. */}
+                        {p.marca.trim() &&
+                          p.marca.trim().toLowerCase() !== p.cliente.trim().toLowerCase() && (
+                            <span className="block text-[11px] font-normal text-muted-foreground">
+                              para {p.marca}
+                            </span>
+                          )}
+                      </td>
                       <td className="px-4 py-3 hidden md:table-cell tabular-nums text-muted-foreground">
                         {p.numeroServico}
                       </td>

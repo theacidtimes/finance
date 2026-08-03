@@ -7,6 +7,7 @@ import { usePerfil } from "@/components/PerfilProvider";
 import { ImportarPedido } from "@/components/screens/ImportarPedido";
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
+import { metaProposta, destinatario } from "@/lib/proposta";
 import { formatBRL0 } from "@/utils/format";
 import { CATALOGO, TEXTOS_MESTRE, blocosParaProdutos, type ItemProposta } from "@/data/catalogo";
 import type { BlocosProposta } from "@/types";
@@ -296,11 +297,19 @@ export function Orcamento() {
           <div className="text-sm font-semibold tracking-tight">THE ACID TIMES LTDA</div>
           <div className="text-xs text-muted-foreground mt-0.5">CNPJ: 36.458.402/0001-81</div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground mt-4">
-            <span><b>Data:</b> {proj.data}</span>
-            <span><b>Cliente:</b> {proj.cliente}</span>
-            <span><b>Projeto:</b> {proj.projeto} ({proj.numeroServico})</span>
-            <span><b>Validade:</b> {proj.validadeProposta}</span>
+            {metaProposta(proj).map((m) => (
+              <span key={m.rotulo}>
+                <b>{m.rotulo}:</b> {m.valor}
+              </span>
+            ))}
           </div>
+
+          {!proj.contato?.trim() && (
+            <p className="text-[11px] text-amber-600 mt-2">
+              Sem contato definido. Preencha em Cadastro — o nome de quem pediu o orçamento sai no
+              cabeçalho e é o que dá segurança a quem recebe.
+            </p>
+          )}
 
           {editando ? (
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-3">
@@ -349,7 +358,7 @@ export function Orcamento() {
           )}
         </div>
 
-        <Bloco n="1" titulo="Projeto">{proj.projeto} — {proj.tipo} para {proj.cliente}.</Bloco>
+        <Bloco n="1" titulo="Projeto">{proj.projeto} — {proj.tipo} para {destinatario(proj)}.</Bloco>
         <Bloco n="2" titulo="O serviço inclui">{area("servicoInclui", 16)}</Bloco>
         <Bloco n="3" titulo="Especificação da entrega">{area("entrega", 8, true)}</Bloco>
 

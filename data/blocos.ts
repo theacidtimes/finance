@@ -38,6 +38,8 @@ export const BLOCOS_PADRAO: BlocosProposta = {
 export function novoProjetoDefaults() {
   return {
     cliente: "",
+    marca: "",
+    contato: "",
     projeto: "",
     numeroServico: "",
     tipo: "Filme" as const,

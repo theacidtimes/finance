@@ -15,8 +15,9 @@ import type { ItemProposta } from "./catalogo";
  */
 export interface BriefingDados {
   // Informações gerais
-  marca: string; // → Projeto.cliente
+  marca: string; // → Projeto.marca (e Projeto.cliente, na falta de agência declarada)
   projeto: string; // → Projeto.projeto
+  solicitante: string; // quem está pedindo → Projeto.contato (sai no cabeçalho da proposta)
   contatos: string; // time do cliente (account/produção/criação) — livre
   contexto: string; // contexto/racional do projeto
 
@@ -47,6 +48,7 @@ export interface BriefingDados {
 export const BRIEFING_VAZIO: BriefingDados = {
   marca: "",
   projeto: "",
+  solicitante: "",
   contatos: "",
   contexto: "",
   roteiroUrl: "",
@@ -84,6 +86,7 @@ export interface CampoBriefing {
 export const CAMPOS_BRIEFING: CampoBriefing[] = [
   { key: "marca", label: "Marca", tipo: "text", grupo: "Informações gerais" },
   { key: "projeto", label: "Projeto", tipo: "text", grupo: "Informações gerais" },
+  { key: "solicitante", label: "Quem está pedindo", tipo: "text", hint: "Nome de quem solicita o orçamento", grupo: "Informações gerais" },
   { key: "contatos", label: "Time (account / produção / criação)", tipo: "textarea", grupo: "Informações gerais" },
   { key: "contexto", label: "Contexto do projeto", tipo: "textarea", grupo: "Informações gerais" },
 
@@ -153,7 +156,15 @@ export function briefingParaProposta(d: BriefingDados): {
   entrega: string;
 } {
   const projPatch: Partial<Projeto> = {};
-  if (d.marca.trim()) projPatch.cliente = d.marca.trim();
+  // O pedido só conhece a marca — quem preenche não declara se há uma agência
+  // no meio. Então pré-preenchemos os dois campos com o mesmo valor: para
+  // cliente direto já está certo, e quando houver agência basta corrigir
+  // `cliente` no cadastro. `metaProposta` omite a marca enquanto forem iguais.
+  if (d.marca.trim()) {
+    projPatch.cliente = d.marca.trim();
+    projPatch.marca = d.marca.trim();
+  }
+  if (d.solicitante.trim()) projPatch.contato = d.solicitante.trim();
   if (d.projeto.trim()) projPatch.projeto = d.projeto.trim();
   if (d.roteiroUrl.trim()) projPatch.roteiroUrl = d.roteiroUrl.trim();
   if (d.formaPagamento.trim()) projPatch.condicaoPagamento = d.formaPagamento.trim();

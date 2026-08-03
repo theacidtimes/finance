@@ -41,8 +41,13 @@ export const FERRAMENTA: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
-      marca: { type: "string", description: "Marca/cliente do pedido" },
+      marca: { type: "string", description: "Marca/cliente final do pedido" },
       projeto: { type: "string", description: "Nome do projeto/campanha" },
+      solicitante: {
+        type: "string",
+        description:
+          "Nome da pessoa que está pedindo o orçamento — quem assina o e-mail ou consta como remetente/requisitante. Apenas o nome, sem cargo.",
+      },
       contatos: { type: "string", description: "Time do cliente (account/produção/criação)" },
       contexto: { type: "string", description: "Contexto/racional do projeto" },
       roteiroUrl: { type: "string", description: "Link do roteiro aprovado, se houver" },
@@ -97,6 +102,7 @@ export function normalizarBriefing(raw: unknown): BriefingDados {
     ...BRIEFING_VAZIO,
     marca: str(o.marca),
     projeto: str(o.projeto),
+    solicitante: str(o.solicitante),
     contatos: str(o.contatos),
     contexto: str(o.contexto),
     roteiroUrl: str(o.roteiroUrl),
