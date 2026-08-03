@@ -88,11 +88,30 @@ const s = StyleSheet.create({
   },
 });
 
-/** Bloco da proposta. Some do documento quando não tem conteúdo (ver lib/proposta.ts). */
-function Block({ b, children }: { b: BlocoProposta; children: React.ReactNode }) {
+/**
+ * Bloco da proposta. Some do documento quando não tem conteúdo (ver lib/proposta.ts).
+ *
+ * O bloco quebra entre páginas de propósito. Com `wrap={false}` ele pulava
+ * inteiro para a página seguinte quando não coubesse no que restava — e o que
+ * restava virava um buraco branco no pé da página. `minPresenceAhead` resolve o
+ * lado feio da quebra: se sobrar menos que isso, o bloco começa na próxima
+ * página em vez de deixar o título sozinho no rodapé.
+ *
+ * `unido` é para o que não pode ser partido — a caixa do investimento, que tem
+ * moldura e ficaria cortada ao meio.
+ */
+function Block({
+  b,
+  unido,
+  children,
+}: {
+  b: BlocoProposta;
+  unido?: boolean;
+  children: React.ReactNode;
+}) {
   if (!b.incluso) return null;
   return (
-    <View style={s.block} wrap={false}>
+    <View style={s.block} wrap={!unido} minPresenceAhead={unido ? 0 : 56}>
       <Text style={s.blockHead}>
         {b.n}. {b.titulo}
       </Text>
@@ -126,7 +145,13 @@ export type PropostaData = {
   logoDataUrl?: string;
 };
 
-function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: PropostaData) {
+export function PropostaDoc({
+  proj,
+  blocos,
+  cronograma,
+  receitaBruta,
+  logoDataUrl,
+}: PropostaData) {
   // Quais blocos entram e com que número — mesma fonte que a tela usa.
   const B = blocosProposta(proj, blocos, cronograma);
   // O flag `miudo` decide o corpo: termos em fonte menor que o resto.
@@ -174,7 +199,7 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
           <Ficha texto={blocos.entrega} />
         </Block>
 
-        <Block b={B.investimento}>
+        <Block b={B.investimento} unido>
           <View style={s.investBox}>
             <Text style={s.investLabel}>Investimento total do projeto</Text>
             <Text style={s.investValue}>{formatBRL0(receitaBruta)}</Text>
