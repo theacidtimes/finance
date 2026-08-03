@@ -7,7 +7,15 @@ import { usePerfil } from "@/components/PerfilProvider";
 import { ImportarPedido } from "@/components/screens/ImportarPedido";
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
-import { metaProposta, destinatario, blocosProposta, type BlocoProposta } from "@/lib/proposta";
+import {
+  metaProposta,
+  destinatario,
+  blocosProposta,
+  parseFicha,
+  serializarFicha,
+  ROTULOS_FICHA,
+  type BlocoProposta,
+} from "@/lib/proposta";
 import { formatBRL0 } from "@/utils/format";
 import { CATALOGO, TEXTOS_MESTRE, blocosParaProdutos, type ItemProposta } from "@/data/catalogo";
 import type { BlocosProposta } from "@/types";
@@ -53,7 +61,13 @@ function Bloco({
           </span>
         )}
       </h4>
-      <div className="text-sm leading-relaxed whitespace-pre-wrap">{children}</div>
+      <div
+        className={`leading-relaxed whitespace-pre-wrap ${
+          b.miudo ? "text-[12.5px] text-foreground/80" : "text-sm"
+        }`}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -145,34 +159,103 @@ function SeletorProdutos({
 }
 
 /**
- * Separa "Rótulo: valor" para destacar o rótulo em negrito.
- * Devolve null quando a linha não é um campo de ficha (prosa, bullet, URL).
+ * Bloco em formato de ficha (padrão dos PDFs da ACID): um campo por linha,
+ * rótulo em negrito. Linhas que não seguem "Rótulo: valor" saem como texto.
+ * Usa o mesmo parser do PDF — o que se lê aqui é o que é impresso.
  */
-function partesFicha(linha: string): { rotulo: string; valor: string } | null {
-  const m = linha.match(/^\s*([^:]{2,32}):\s?(.*)$/);
-  if (!m) return null;
-  if (m[2].startsWith("//")) return null; // https://… não é rótulo
-  return { rotulo: m[1].trim(), valor: m[2] };
+function Ficha({ texto }: { texto: string }) {
+  return (
+    <div className="space-y-0.5">
+      {parseFicha(texto).map((l, i) =>
+        l.rotulo ? (
+          <div key={i}>
+            <span className="font-semibold">{l.rotulo}:</span>
+            {l.valor ? ` ${l.valor}` : ""}
+          </div>
+        ) : (
+          <div key={i}>{l.valor || "\u00A0"}</div>
+        )
+      )}
+    </div>
+  );
 }
 
 /**
- * Bloco em formato de ficha (padrão dos PDFs da ACID): um campo por linha,
- * rótulo em negrito. Linhas que não seguem "Rótulo: valor" saem como texto.
+ * Editor da "Especificação da entrega": uma linha por campo, rótulo à esquerda
+ * e valor à direita.
+ *
+ * A ficha sempre teve estrutura — os templates do catálogo já nascem em
+ * "Rótulo: valor" e o PDF já imprime o rótulo em negrito. O que faltava era o
+ * editor admitir isso: num textarea, um dois-pontos esquecido virava campo
+ * perdido, sem aviso, e só aparecia no PDF.
+ *
+ * A gravação continua sendo o mesmo texto de sempre (`parseFicha`/
+ * `serializarFicha` são inversos), então nada muda no banco, no importador de
+ * pedido nem nos templates do catálogo — inclusive as linhas de cabeçalho
+ * ("Filme IA (2x):") e as linhas em branco que separam produtos.
  */
-function Ficha({ texto }: { texto: string }) {
-  if (!texto.trim()) return <span className="text-muted-foreground/40">—</span>;
+function FichaEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const linhas = parseFicha(value);
+  const commit = (next: typeof linhas) => onChange(serializarFicha(next));
+
+  const setLinha = (i: number, patch: Partial<(typeof linhas)[number]>) =>
+    commit(linhas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+
+  const remover = (i: number) => commit(linhas.filter((_, j) => j !== i));
+  const adicionar = () => commit([...linhas, { rotulo: "", valor: "" }]);
+
+  const campo =
+    "border border-input rounded-md px-2 py-1 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-ring";
+
   return (
-    <div className="space-y-0.5">
-      {texto.split("\n").map((linha, i) => {
-        const p = partesFicha(linha);
-        if (!p) return <div key={i}>{linha || "\u00A0"}</div>;
-        return (
-          <div key={i}>
-            <span className="font-semibold">{p.rotulo}:</span>
-            {p.valor ? ` ${p.valor}` : ""}
-          </div>
-        );
-      })}
+    <div className="space-y-1.5">
+      <datalist id="rotulos-ficha">
+        {ROTULOS_FICHA.map((r) => (
+          <option key={r} value={r} />
+        ))}
+      </datalist>
+
+      {linhas.map((l, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <input
+            value={l.rotulo}
+            list="rotulos-ficha"
+            maxLength={32}
+            // ":" separa rótulo de valor e rótulo longo deixa de ser rótulo —
+            // barrar na digitação evita que o campo se desfaça ao salvar.
+            onChange={(e) => setLinha(i, { rotulo: e.target.value.replace(/:/g, "") })}
+            placeholder="Campo"
+            className={`${campo} w-44 shrink-0 font-semibold`}
+          />
+          <input
+            value={l.valor}
+            onChange={(e) => setLinha(i, { valor: e.target.value })}
+            placeholder={l.rotulo ? "Valor" : "Linha livre (sem rótulo)"}
+            className={`${campo} flex-1`}
+          />
+          <button
+            onClick={() => remover(i)}
+            className="text-muted-foreground hover:text-danger px-1"
+            aria-label="Remover campo"
+            title="Remover campo"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3 pt-1">
+        <button
+          onClick={adicionar}
+          className="text-xs px-2 py-1 rounded border border-input hover:bg-muted"
+        >
+          + campo
+        </button>
+        <span className="text-[11px] text-muted-foreground">
+          O rótulo sai em negrito na proposta. Deixe o rótulo em branco para uma linha
+          livre.
+        </span>
+      </div>
     </div>
   );
 }
@@ -184,33 +267,21 @@ function Area({
   value,
   onChange,
   rows = 4,
-  ficha = false,
 }: {
   editando: boolean;
   value: string;
   onChange: (v: string) => void;
   rows?: number;
-  ficha?: boolean;
 }) {
-  if (!editando) {
-    if (ficha) return <Ficha texto={value} />;
-    return <>{value || <span className="text-muted-foreground/40">—</span>}</>;
-  }
+  // Em visualização, bloco vazio nem chega aqui: ele sai da proposta.
+  if (!editando) return <>{value}</>;
   return (
-    <>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={rows}
-        className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
-      />
-      {ficha && (
-        <p className="text-[11px] text-muted-foreground mt-1">
-          Um campo por linha, no formato <code>Rótulo: valor</code> (ex.:{" "}
-          <code>Tempo de uso: 12 meses</code>). O rótulo sai em negrito na proposta.
-        </p>
-      )}
-    </>
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      rows={rows}
+      className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
+    />
   );
 }
 
@@ -256,14 +327,8 @@ export function Orcamento() {
   const B = blocosProposta(proj, blocos, cronograma);
   const vazios = Object.values(B).filter((b) => !b.incluso).length;
 
-  const area = (k: keyof BlocosProposta, rows = 4, ficha = false) => (
-    <Area
-      editando={editando}
-      value={blocos[k]}
-      onChange={(v) => setBloco(k, v)}
-      rows={rows}
-      ficha={ficha}
-    />
+  const area = (k: keyof BlocosProposta, rows = 4) => (
+    <Area editando={editando} value={blocos[k]} onChange={(v) => setBloco(k, v)} rows={rows} />
   );
 
   // Regenera apenas os blocos derivados; os fixos (IA, materiais, cancelamento)
@@ -383,7 +448,13 @@ export function Orcamento() {
           {proj.projeto} — {proj.tipo} para {destinatario(proj)}.
         </Bloco>
         <Bloco b={B.servicoInclui} editando={editando}>{area("servicoInclui", 16)}</Bloco>
-        <Bloco b={B.entrega} editando={editando}>{area("entrega", 8, true)}</Bloco>
+        <Bloco b={B.entrega} editando={editando}>
+          {editando ? (
+            <FichaEditor value={blocos.entrega} onChange={(v) => setBloco("entrega", v)} />
+          ) : (
+            <Ficha texto={blocos.entrega} />
+          )}
+        </Bloco>
 
         <Bloco b={B.investimento} editando={editando}>
           <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">

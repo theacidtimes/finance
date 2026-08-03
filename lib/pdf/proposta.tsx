@@ -11,7 +11,13 @@ import {
 import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
 import { formatBRL0 } from "@/utils/format";
 import { TEXTOS_MESTRE } from "@/data/catalogo";
-import { metaProposta, destinatario, blocosProposta, type BlocoProposta } from "@/lib/proposta";
+import {
+  metaProposta,
+  destinatario,
+  blocosProposta,
+  parseFicha,
+  type BlocoProposta,
+} from "@/lib/proposta";
 
 const INK = "#111111";
 const MUTED = "#6B7280";
@@ -47,6 +53,8 @@ const s = StyleSheet.create({
     marginBottom: 5,
   },
   body: { fontSize: 10, lineHeight: 1.55 },
+  // Termos e condições: menor que o corpo, mas ainda legível em papel.
+  bodyMiudo: { fontSize: 8.5, lineHeight: 1.5, color: "#333333" },
   fichaRow: { fontSize: 10, lineHeight: 1.55, marginBottom: 1 },
   fichaLabel: { fontFamily: "Helvetica-Bold" },
   investBox: {
@@ -95,28 +103,17 @@ function Block({ b, children }: { b: BlocoProposta; children: React.ReactNode })
 
 /**
  * Bloco em formato de ficha: um campo por linha, rótulo em negrito.
- * Espelha o `Ficha` da tela (components/screens/Orcamento.tsx).
+ * Usa o mesmo parser da tela (`parseFicha`), então imprime o que foi revisado.
  */
 function Ficha({ texto }: { texto: string }) {
-  if (!texto.trim()) return <Text style={s.body}>—</Text>;
   return (
     <>
-      {texto.split("\n").map((linha, i) => {
-        const m = linha.match(/^\s*([^:]{2,32}):\s?(.*)$/);
-        if (!m || m[2].startsWith("//")) {
-          return (
-            <Text key={i} style={s.fichaRow}>
-              {linha}
-            </Text>
-          );
-        }
-        return (
-          <Text key={i} style={s.fichaRow}>
-            <Text style={s.fichaLabel}>{m[1].trim()}:</Text>
-            {m[2] ? ` ${m[2]}` : ""}
-          </Text>
-        );
-      })}
+      {parseFicha(texto).map((l, i) => (
+        <Text key={i} style={s.fichaRow}>
+          {l.rotulo ? <Text style={s.fichaLabel}>{l.rotulo}:</Text> : null}
+          {l.rotulo ? (l.valor ? ` ${l.valor}` : "") : l.valor}
+        </Text>
+      ))}
     </>
   );
 }
@@ -132,6 +129,8 @@ export type PropostaData = {
 function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: PropostaData) {
   // Quais blocos entram e com que número — mesma fonte que a tela usa.
   const B = blocosProposta(proj, blocos, cronograma);
+  // O flag `miudo` decide o corpo: termos em fonte menor que o resto.
+  const corpo = (b: BlocoProposta) => (b.miudo ? s.bodyMiudo : s.body);
   return (
     <Document
       title={`Proposta ${proj.cliente} ${proj.projeto}`.trim()}
@@ -209,16 +208,16 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
           <Text style={s.body}>{blocos.observacoes}</Text>
         </Block>
         <Block b={B.cancelamento}>
-          <Text style={s.body}>{TEXTOS_MESTRE.cancelamento}</Text>
+          <Text style={corpo(B.cancelamento)}>{TEXTOS_MESTRE.cancelamento}</Text>
         </Block>
         <Block b={B.clausulaIA}>
-          <Text style={s.body}>{TEXTOS_MESTRE.clausulaIA}</Text>
+          <Text style={corpo(B.clausulaIA)}>{TEXTOS_MESTRE.clausulaIA}</Text>
         </Block>
         <Block b={B.materiais}>
-          <Text style={s.body}>{TEXTOS_MESTRE.materiais}</Text>
+          <Text style={corpo(B.materiais)}>{TEXTOS_MESTRE.materiais}</Text>
         </Block>
         <Block b={B.validade}>
-          <Text style={s.body}>
+          <Text style={corpo(B.validade)}>
             Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
           </Text>
         </Block>

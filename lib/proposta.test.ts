@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { metaProposta, destinatario, blocosProposta, type ChaveBloco } from "./proposta";
+import {
+  metaProposta,
+  destinatario,
+  blocosProposta,
+  parseFicha,
+  serializarFicha,
+  fichaVisivel,
+  type ChaveBloco,
+} from "./proposta";
 import { novoProjetoDefaults, BLOCOS_PADRAO } from "@/data/blocos";
 import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
 
@@ -169,6 +177,95 @@ describe("blocos da proposta: vazio não ocupa página", () => {
     const p = proj({ condicaoPagamento: "À vista" });
     const b = blocosDe({ exclusoes: "" });
     expect(blocosProposta(p, b, crono)).toEqual(blocosProposta(p, b, crono));
+  });
+});
+
+describe("ficha da entrega: texto ⇄ campos", () => {
+  const ida = (t: string) => serializarFicha(parseFicha(t));
+
+  it("separa rótulo e valor", () => {
+    expect(parseFicha("Duração: 30 segundos")).toEqual([
+      { rotulo: "Duração", valor: "30 segundos" },
+    ]);
+  });
+
+  it("linha sem rótulo fica livre, com o texto inteiro", () => {
+    expect(parseFicha("Entrega conforme cronograma")).toEqual([
+      { rotulo: "", valor: "Entrega conforme cronograma" },
+    ]);
+  });
+
+  it("URL não vira rótulo", () => {
+    const t = "https://docs.google.com/x";
+    expect(parseFicha(t)).toEqual([{ rotulo: "", valor: t }]);
+    expect(ida(t)).toBe(t);
+  });
+
+  it("editar não pode reescrever o texto: ida e volta é idêntica", () => {
+    // Exatamente o que `blocosParaProdutos` gera para dois produtos: linha de
+    // cabeçalho com rótulo sem valor, e linha em branco separando os blocos.
+    const t = [
+      "Filme IA (2x):",
+      "Entregável: 1 filme",
+      'Duração: 30"',
+      "",
+      "Vinheta:",
+      "Entregável: 1 vinheta",
+    ].join("\n");
+    expect(ida(t)).toBe(t);
+    // e a linha em branco continua sendo uma linha, não some
+    expect(parseFicha(t)).toHaveLength(6);
+    expect(parseFicha(t)[3]).toEqual({ rotulo: "", valor: "" });
+  });
+
+  it("rótulo de um caractere sobrevive — é o que se digita antes do segundo", () => {
+    expect(parseFicha("D: 30")).toEqual([{ rotulo: "D", valor: "30" }]);
+    expect(ida("D: 30")).toBe("D: 30");
+  });
+
+  it("rótulo sem valor não acumula espaço a cada edição", () => {
+    expect(ida("Duração: ")).toBe("Duração:");
+    expect(ida("Duração:")).toBe("Duração:"); // estável a partir daí
+  });
+
+  it("campo novo em branco vira uma linha, e não some ao salvar", () => {
+    const comNovo = serializarFicha([...parseFicha("Duração: 30"), { rotulo: "", valor: "" }]);
+    expect(parseFicha(comNovo)).toHaveLength(2);
+  });
+
+  it("ficha só com espaços não conta como conteúdo", () => {
+    expect(fichaVisivel("")).toBe(false);
+    expect(fichaVisivel("\n\n  \n")).toBe(false);
+    expect(fichaVisivel("Duração: 30")).toBe(true);
+    // rótulo preenchido sem valor ainda é algo escrito — e sai impresso
+    expect(fichaVisivel("Duração: ")).toBe(true);
+  });
+
+  it("entrega em branco tira o bloco da proposta", () => {
+    const b = blocosProposta(proj(), blocosDe({ entrega: "\n \n" }), crono);
+    expect(b.entrega.incluso).toBe(false);
+  });
+});
+
+describe("termos e condições saem em corpo menor", () => {
+  it("só os blocos de termos são miúdos", () => {
+    const B = blocosProposta(proj({ condicaoPagamento: "À vista" }), blocosDe(), crono);
+    const miudos = Object.values(B)
+      .filter((b) => b.miudo)
+      .map((b) => b.titulo);
+    expect(miudos).toEqual([
+      "Cancelamento",
+      "Imagens e limitações técnicas em IA",
+      "Materiais de apoio",
+      "Validade",
+    ]);
+  });
+
+  it("escopo e investimento seguem no corpo normal", () => {
+    const B = blocosProposta(proj(), blocosDe(), crono);
+    expect(B.servicoInclui.miudo).toBe(false);
+    expect(B.entrega.miudo).toBe(false);
+    expect(B.investimento.miudo).toBe(false);
   });
 });
 

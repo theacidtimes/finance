@@ -50,6 +50,80 @@ export function destinatario(proj: Projeto): string {
 }
 
 /* ============================================================
+ * Ficha — "Rótulo: valor", um campo por linha
+ * ========================================================== */
+
+/**
+ * Uma linha da "Especificação da entrega".
+ *
+ * `rotulo` vazio = linha livre (prosa, bullet, URL, ou linha em branco usada
+ * como separador entre produtos). O texto inteiro fica em `valor`.
+ */
+export interface LinhaFicha {
+  rotulo: string;
+  valor: string;
+}
+
+// Um rótulo tem no máximo 32 caracteres e não contém ":". O limite baixo é o
+// que separa "Duração: 30s" (campo) de uma frase que por acaso tem dois-pontos.
+// Aceita 1 caractere para não quebrar a digitação do primeiro caractere no
+// editor — com {2,} a linha "D: valor" viraria texto livre no meio do que se
+// está escrevendo.
+const RE_FICHA = /^\s*([^:]{1,32}):\s?(.*)$/;
+
+/**
+ * Quebra a ficha em linhas estruturadas.
+ *
+ * Este é o único parser: a tela, o editor e o PDF usam todos este. Havia duas
+ * cópias do mesmo regex em arquivos diferentes — bastava alguém ajustar uma
+ * para o cliente receber um PDF diferente do que foi revisado na tela.
+ */
+export function parseFicha(texto: string): LinhaFicha[] {
+  return (texto ?? "").split("\n").map((linha) => {
+    const m = linha.match(RE_FICHA);
+    // "https://..." casa o regex com rótulo "https" — não é campo, é URL.
+    if (!m || m[2].startsWith("//")) return { rotulo: "", valor: linha };
+    return { rotulo: m[1].trim(), valor: m[2] };
+  });
+}
+
+/**
+ * Volta ao texto. Inverso de `parseFicha` — inclusive para linhas em branco,
+ * que o catálogo usa como separador entre produtos e não podem sumir.
+ */
+export function serializarFicha(linhas: LinhaFicha[]): string {
+  return linhas
+    .map((l) => {
+      if (!l.rotulo) return l.valor;
+      // Sem valor, sem espaço sobrando: é o caso das linhas de cabeçalho que o
+      // catálogo gera ("Filme IA (2x):"). Um espaço a cada edição faria o texto
+      // mudar sozinho toda vez que alguém abrisse a proposta.
+      return l.valor ? `${l.rotulo}: ${l.valor}` : `${l.rotulo}:`;
+    })
+    .join("\n");
+}
+
+/** A ficha tem algo para imprimir? Só espaço e linha em branco não conta. */
+export function fichaVisivel(texto: string): boolean {
+  return parseFicha(texto).some((l) => Boolean(l.rotulo.trim() || l.valor.trim()));
+}
+
+/** Rótulos usados nas fichas da ACID — sugestão no editor, para não divergir. */
+export const ROTULOS_FICHA = [
+  "Entregável",
+  "Duração",
+  "Formato",
+  "Território",
+  "Tempo de uso",
+  "Mídia",
+  "Trilha",
+  "Locução",
+  "Acessibilidade",
+  "Deliveries de imagem",
+  "Deliveries de áudio",
+];
+
+/* ============================================================
  * Blocos da proposta — quais entram e com que número
  * ========================================================== */
 
@@ -75,10 +149,18 @@ export interface BlocoProposta {
   incluso: boolean;
   /** Número de exibição, contado só entre os blocos inclusos. "" quando fora. */
   n: string;
+  /** Termos e condições: corpo em corpo menor que o resto da proposta. */
+  miudo: boolean;
 }
 
-/** Ordem canônica da proposta. `sempre` = bloco que nunca fica vazio. */
-const ORDEM: { chave: ChaveBloco; titulo: string; sempre?: true }[] = [
+/**
+ * Ordem canônica da proposta.
+ *  `sempre` — bloco derivado ou fixo, nunca fica vazio nem some.
+ *  `miudo`  — termos e condições. São o fecho jurídico da proposta, não o
+ *             argumento de venda: entram em corpo menor para não competir com
+ *             escopo e investimento, que é o que o cliente precisa ler.
+ */
+const ORDEM: { chave: ChaveBloco; titulo: string; sempre?: true; miudo?: true }[] = [
   { chave: "projeto", titulo: "Projeto", sempre: true },
   { chave: "servicoInclui", titulo: "O serviço inclui" },
   { chave: "entrega", titulo: "Especificação da entrega" },
@@ -88,10 +170,15 @@ const ORDEM: { chave: ChaveBloco; titulo: string; sempre?: true }[] = [
   { chave: "exclusoes", titulo: "Não está incluso" },
   { chave: "alteracoes", titulo: "Alterações e refações" },
   { chave: "observacoes", titulo: "Observações" },
-  { chave: "cancelamento", titulo: "Cancelamento", sempre: true },
-  { chave: "clausulaIA", titulo: "Imagens e limitações técnicas em IA", sempre: true },
-  { chave: "materiais", titulo: "Materiais de apoio", sempre: true },
-  { chave: "validade", titulo: "Validade", sempre: true },
+  { chave: "cancelamento", titulo: "Cancelamento", sempre: true, miudo: true },
+  {
+    chave: "clausulaIA",
+    titulo: "Imagens e limitações técnicas em IA",
+    sempre: true,
+    miudo: true,
+  },
+  { chave: "materiais", titulo: "Materiais de apoio", sempre: true, miudo: true },
+  { chave: "validade", titulo: "Validade", sempre: true, miudo: true },
 ];
 
 const cheio = (v?: string) => Boolean(v && v.trim());
@@ -119,7 +206,8 @@ export function blocosProposta(
   const temConteudo: Record<ChaveBloco, boolean> = {
     projeto: true,
     servicoInclui: cheio(blocos.servicoInclui),
-    entrega: cheio(blocos.entrega),
+    // A entrega é uma ficha: só linha em branco ou "\n" solto não é conteúdo.
+    entrega: fichaVisivel(blocos.entrega),
     investimento: true,
     pagamento: cheio(proj.condicaoPagamento),
     // Marco em branco (linha adicionada e não preenchida) não conta como
@@ -144,6 +232,7 @@ export function blocosProposta(
       titulo: item.titulo,
       incluso,
       n: incluso ? String(n) : "",
+      miudo: Boolean(item.miudo),
     };
   }
   return out;
