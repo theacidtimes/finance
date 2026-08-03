@@ -11,7 +11,7 @@ import {
 import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
 import { formatBRL0 } from "@/utils/format";
 import { TEXTOS_MESTRE } from "@/data/catalogo";
-import { metaProposta, destinatario } from "@/lib/proposta";
+import { metaProposta, destinatario, blocosProposta, type BlocoProposta } from "@/lib/proposta";
 
 const INK = "#111111";
 const MUTED = "#6B7280";
@@ -80,11 +80,13 @@ const s = StyleSheet.create({
   },
 });
 
-function Block({ n, titulo, children }: { n: string; titulo: string; children: React.ReactNode }) {
+/** Bloco da proposta. Some do documento quando não tem conteúdo (ver lib/proposta.ts). */
+function Block({ b, children }: { b: BlocoProposta; children: React.ReactNode }) {
+  if (!b.incluso) return null;
   return (
     <View style={s.block} wrap={false}>
       <Text style={s.blockHead}>
-        {n}. {titulo}
+        {b.n}. {b.titulo}
       </Text>
       {children}
     </View>
@@ -128,7 +130,8 @@ export type PropostaData = {
 };
 
 function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: PropostaData) {
-  const dash = (v: string) => (v && v.trim() ? v : "—");
+  // Quais blocos entram e com que número — mesma fonte que a tela usa.
+  const B = blocosProposta(proj, blocos, cronograma);
   return (
     <Document
       title={`Proposta ${proj.cliente} ${proj.projeto}`.trim()}
@@ -160,19 +163,19 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
 
         <Text style={s.titulo}>{proj.titulo}</Text>
 
-        <Block n="1" titulo="Projeto">
+        <Block b={B.projeto}>
           <Text style={s.body}>
             {proj.projeto} — {proj.tipo} para {destinatario(proj)}.
           </Text>
         </Block>
-        <Block n="2" titulo="O serviço inclui">
-          <Text style={s.body}>{dash(blocos.servicoInclui)}</Text>
+        <Block b={B.servicoInclui}>
+          <Text style={s.body}>{blocos.servicoInclui}</Text>
         </Block>
-        <Block n="3" titulo="Especificação da entrega">
+        <Block b={B.entrega}>
           <Ficha texto={blocos.entrega} />
         </Block>
 
-        <Block n="4" titulo="Investimento">
+        <Block b={B.investimento}>
           <View style={s.investBox}>
             <Text style={s.investLabel}>Investimento total do projeto</Text>
             <Text style={s.investValue}>{formatBRL0(receitaBruta)}</Text>
@@ -180,42 +183,38 @@ function PropostaDoc({ proj, blocos, cronograma, receitaBruta, logoDataUrl }: Pr
           <Text style={s.investNote}>Valor bruto, impostos inclusos.</Text>
         </Block>
 
-        <Block n="5" titulo="Condições de pagamento">
-          <Text style={s.body}>{dash(proj.condicaoPagamento)}</Text>
+        <Block b={B.pagamento}>
+          <Text style={s.body}>{proj.condicaoPagamento}</Text>
         </Block>
 
-        <Block n="6" titulo="Cronograma">
-          {cronograma.length ? (
-            cronograma.map((m, i) => (
-              <View key={i} style={s.cronoRow}>
-                <Text style={s.cronoData}>{m.data}</Text>
-                <Text style={s.cronoMarco}>{m.marco}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={s.body}>—</Text>
-          )}
+        <Block b={B.cronograma}>
+          {cronograma.map((m, i) => (
+            <View key={i} style={s.cronoRow}>
+              <Text style={s.cronoData}>{m.data}</Text>
+              <Text style={s.cronoMarco}>{m.marco}</Text>
+            </View>
+          ))}
         </Block>
 
-        <Block n="7" titulo="Não está incluso">
-          <Text style={s.body}>{dash(blocos.exclusoes)}</Text>
+        <Block b={B.exclusoes}>
+          <Text style={s.body}>{blocos.exclusoes}</Text>
         </Block>
-        <Block n="8" titulo="Alterações e refações">
-          <Text style={s.body}>{dash(blocos.alteracoes)}</Text>
+        <Block b={B.alteracoes}>
+          <Text style={s.body}>{blocos.alteracoes}</Text>
         </Block>
-        <Block n="9" titulo="Observações">
-          <Text style={s.body}>{dash(blocos.observacoes)}</Text>
+        <Block b={B.observacoes}>
+          <Text style={s.body}>{blocos.observacoes}</Text>
         </Block>
-        <Block n="10" titulo="Cancelamento">
+        <Block b={B.cancelamento}>
           <Text style={s.body}>{TEXTOS_MESTRE.cancelamento}</Text>
         </Block>
-        <Block n="11" titulo="Imagens e limitações técnicas em IA">
+        <Block b={B.clausulaIA}>
           <Text style={s.body}>{TEXTOS_MESTRE.clausulaIA}</Text>
         </Block>
-        <Block n="12" titulo="Materiais de apoio">
+        <Block b={B.materiais}>
           <Text style={s.body}>{TEXTOS_MESTRE.materiais}</Text>
         </Block>
-        <Block n="13" titulo="Validade">
+        <Block b={B.validade}>
           <Text style={s.body}>
             Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
           </Text>

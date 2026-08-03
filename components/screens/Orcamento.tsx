@@ -7,32 +7,49 @@ import { usePerfil } from "@/components/PerfilProvider";
 import { ImportarPedido } from "@/components/screens/ImportarPedido";
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
-import { metaProposta, destinatario } from "@/lib/proposta";
+import { metaProposta, destinatario, blocosProposta, type BlocoProposta } from "@/lib/proposta";
 import { formatBRL0 } from "@/utils/format";
 import { CATALOGO, TEXTOS_MESTRE, blocosParaProdutos, type ItemProposta } from "@/data/catalogo";
 import type { BlocosProposta } from "@/types";
 
+/**
+ * Bloco da proposta.
+ *
+ * Vazio, ele não vai para o cliente (ver `blocosProposta`). Mas em modo de
+ * edição continua na tela — some-lo aqui tiraria justamente o campo que a
+ * pessoa precisa preencher. Fica com aviso, e a numeração exibida já é a
+ * numeração final: o que se vê editando é o que sai no PDF.
+ */
 function Bloco({
-  n,
-  titulo,
+  b,
+  editando,
   fixo,
   children,
 }: {
-  n: string;
-  titulo: string;
+  b: BlocoProposta;
+  editando: boolean;
   fixo?: boolean;
   children: React.ReactNode;
 }) {
+  if (!b.incluso && !editando) return null;
   return (
-    <div className="mb-6">
+    <div className={`mb-6 ${b.incluso ? "" : "opacity-60"}`}>
       <h4 className="text-[11px] tracking-[0.2em] uppercase font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-        {n}. {titulo}
+        {b.incluso ? `${b.n}. ${b.titulo}` : b.titulo}
         {fixo && (
           <span
             className="text-[8px] tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border normal-case"
             title="Texto padrão da ACID — editável apenas no texto-mestre (mesmo para todos os projetos)"
           >
             fixo
+          </span>
+        )}
+        {!b.incluso && (
+          <span
+            className="text-[8px] tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border normal-case"
+            title="Bloco vazio não entra na proposta — os demais são renumerados"
+          >
+            vazio · fora do PDF
           </span>
         )}
       </h4>
@@ -235,6 +252,10 @@ export function Orcamento() {
     }
   };
 
+  // Quais blocos entram na proposta e com que número — mesma fonte do PDF.
+  const B = blocosProposta(proj, blocos, cronograma);
+  const vazios = Object.values(B).filter((b) => !b.incluso).length;
+
   const area = (k: keyof BlocosProposta, rows = 4, ficha = false) => (
     <Area
       editando={editando}
@@ -358,11 +379,13 @@ export function Orcamento() {
           )}
         </div>
 
-        <Bloco n="1" titulo="Projeto">{proj.projeto} — {proj.tipo} para {destinatario(proj)}.</Bloco>
-        <Bloco n="2" titulo="O serviço inclui">{area("servicoInclui", 16)}</Bloco>
-        <Bloco n="3" titulo="Especificação da entrega">{area("entrega", 8, true)}</Bloco>
+        <Bloco b={B.projeto} editando={editando}>
+          {proj.projeto} — {proj.tipo} para {destinatario(proj)}.
+        </Bloco>
+        <Bloco b={B.servicoInclui} editando={editando}>{area("servicoInclui", 16)}</Bloco>
+        <Bloco b={B.entrega} editando={editando}>{area("entrega", 8, true)}</Bloco>
 
-        <Bloco n="4" titulo="Investimento">
+        <Bloco b={B.investimento} editando={editando}>
           <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">
             <span className="text-sm">Investimento total do projeto</span>
             <span className="text-2xl font-bold tabular-nums">{formatBRL0(dre.receitaBruta)}</span>
@@ -370,11 +393,11 @@ export function Orcamento() {
           <p className="text-xs text-muted-foreground mt-2">Valor bruto, impostos inclusos.</p>
         </Bloco>
 
-        <Bloco n="5" titulo="Condições de pagamento">
+        <Bloco b={B.pagamento} editando={editando}>
           {editando ? <TextInput value={proj.condicaoPagamento} onChange={(v) => setP("condicaoPagamento", v)} /> : proj.condicaoPagamento}
         </Bloco>
 
-        <Bloco n="6" titulo="Cronograma">
+        <Bloco b={B.cronograma} editando={editando}>
           <div className="space-y-1.5">
             {cronograma.map((m, i) => (
               <div key={i} className="flex gap-2 items-center text-sm">
@@ -400,15 +423,22 @@ export function Orcamento() {
           </div>
         </Bloco>
 
-        <Bloco n="7" titulo="Não está incluso">{area("exclusoes", 4)}</Bloco>
-        <Bloco n="8" titulo="Alterações e refações">{area("alteracoes", 5)}</Bloco>
-        <Bloco n="9" titulo="Observações">{area("observacoes", 2)}</Bloco>
-        <Bloco n="10" titulo="Cancelamento" fixo>{TEXTOS_MESTRE.cancelamento}</Bloco>
-        <Bloco n="11" titulo="Imagens e limitações técnicas em IA" fixo>{TEXTOS_MESTRE.clausulaIA}</Bloco>
-        <Bloco n="12" titulo="Materiais de apoio" fixo>{TEXTOS_MESTRE.materiais}</Bloco>
-        <Bloco n="13" titulo="Validade">
+        <Bloco b={B.exclusoes} editando={editando}>{area("exclusoes", 4)}</Bloco>
+        <Bloco b={B.alteracoes} editando={editando}>{area("alteracoes", 5)}</Bloco>
+        <Bloco b={B.observacoes} editando={editando}>{area("observacoes", 2)}</Bloco>
+        <Bloco b={B.cancelamento} editando={editando} fixo>{TEXTOS_MESTRE.cancelamento}</Bloco>
+        <Bloco b={B.clausulaIA} editando={editando} fixo>{TEXTOS_MESTRE.clausulaIA}</Bloco>
+        <Bloco b={B.materiais} editando={editando} fixo>{TEXTOS_MESTRE.materiais}</Bloco>
+        <Bloco b={B.validade} editando={editando}>
           Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
         </Bloco>
+
+        {vazios > 0 && editando && (
+          <p className="text-[11px] text-muted-foreground border-t border-border pt-3 mt-2">
+            {vazios === 1 ? "1 bloco vazio não entra" : `${vazios} blocos vazios não entram`} na
+            proposta enviada — os demais já aparecem aqui com a numeração final.
+          </p>
+        )}
       </div>
     </div>
   );

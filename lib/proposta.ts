@@ -1,4 +1,4 @@
-import type { Projeto } from "@/types";
+import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
 
 /**
  * Cabeçalho da proposta comercial — fonte única para a tela e para o PDF.
@@ -47,4 +47,104 @@ export function metaProposta(proj: Projeto): MetaProposta[] {
  */
 export function destinatario(proj: Projeto): string {
   return proj.marca?.trim() || proj.cliente;
+}
+
+/* ============================================================
+ * Blocos da proposta — quais entram e com que número
+ * ========================================================== */
+
+export type ChaveBloco =
+  | "projeto"
+  | "servicoInclui"
+  | "entrega"
+  | "investimento"
+  | "pagamento"
+  | "cronograma"
+  | "exclusoes"
+  | "alteracoes"
+  | "observacoes"
+  | "cancelamento"
+  | "clausulaIA"
+  | "materiais"
+  | "validade";
+
+export interface BlocoProposta {
+  chave: ChaveBloco;
+  titulo: string;
+  /** Entra na proposta enviada ao cliente. Bloco vazio fica de fora. */
+  incluso: boolean;
+  /** Número de exibição, contado só entre os blocos inclusos. "" quando fora. */
+  n: string;
+}
+
+/** Ordem canônica da proposta. `sempre` = bloco que nunca fica vazio. */
+const ORDEM: { chave: ChaveBloco; titulo: string; sempre?: true }[] = [
+  { chave: "projeto", titulo: "Projeto", sempre: true },
+  { chave: "servicoInclui", titulo: "O serviço inclui" },
+  { chave: "entrega", titulo: "Especificação da entrega" },
+  { chave: "investimento", titulo: "Investimento", sempre: true },
+  { chave: "pagamento", titulo: "Condições de pagamento" },
+  { chave: "cronograma", titulo: "Cronograma" },
+  { chave: "exclusoes", titulo: "Não está incluso" },
+  { chave: "alteracoes", titulo: "Alterações e refações" },
+  { chave: "observacoes", titulo: "Observações" },
+  { chave: "cancelamento", titulo: "Cancelamento", sempre: true },
+  { chave: "clausulaIA", titulo: "Imagens e limitações técnicas em IA", sempre: true },
+  { chave: "materiais", titulo: "Materiais de apoio", sempre: true },
+  { chave: "validade", titulo: "Validade", sempre: true },
+];
+
+const cheio = (v?: string) => Boolean(v && v.trim());
+
+/**
+ * Decide quais blocos entram na proposta e renumera os que sobraram.
+ *
+ * Bloco vazio saía como "—", ocupando linha e empurrando página. Uma proposta
+ * de 4 páginas em que uma delas só diz "6. Cronograma —" passa a impressão de
+ * documento não revisado, além do custo óbvio de papel e rolagem. Então bloco
+ * sem conteúdo simplesmente não existe no documento.
+ *
+ * A numeração é sequencial entre os inclusos — nunca 1,2,3,4,5,9. Por isso ela
+ * mora aqui e não em literais espalhados pelos dois renderizadores: a tela e o
+ * PDF têm de imprimir exatamente os mesmos números.
+ *
+ * Os blocos `sempre` (Projeto, Investimento, os três textos-mestre e Validade)
+ * são derivados ou fixos: não dependem de preenchimento e nunca somem.
+ */
+export function blocosProposta(
+  proj: Projeto,
+  blocos: BlocosProposta,
+  cronograma: MarcoCronograma[]
+): Record<ChaveBloco, BlocoProposta> {
+  const temConteudo: Record<ChaveBloco, boolean> = {
+    projeto: true,
+    servicoInclui: cheio(blocos.servicoInclui),
+    entrega: cheio(blocos.entrega),
+    investimento: true,
+    pagamento: cheio(proj.condicaoPagamento),
+    // Marco em branco (linha adicionada e não preenchida) não conta como
+    // cronograma — senão o bloco entra vazio, que é o que queremos evitar.
+    cronograma: cronograma.some((m) => cheio(m.data) || cheio(m.marco)),
+    exclusoes: cheio(blocos.exclusoes),
+    alteracoes: cheio(blocos.alteracoes),
+    observacoes: cheio(blocos.observacoes),
+    cancelamento: true,
+    clausulaIA: true,
+    materiais: true,
+    validade: true,
+  };
+
+  const out = {} as Record<ChaveBloco, BlocoProposta>;
+  let n = 0;
+  for (const item of ORDEM) {
+    const incluso = item.sempre ? true : temConteudo[item.chave];
+    if (incluso) n += 1;
+    out[item.chave] = {
+      chave: item.chave,
+      titulo: item.titulo,
+      incluso,
+      n: incluso ? String(n) : "",
+    };
+  }
+  return out;
 }
