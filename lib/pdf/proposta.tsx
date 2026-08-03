@@ -13,7 +13,7 @@ import { formatBRL0 } from "@/utils/format";
 import { TEXTOS_MESTRE } from "@/data/catalogo";
 import {
   metaProposta,
-  destinatario,
+  linhaProjeto,
   blocosProposta,
   parseFicha,
   type BlocoProposta,
@@ -188,9 +188,7 @@ export function PropostaDoc({
         <Text style={s.titulo}>{proj.titulo}</Text>
 
         <Block b={B.projeto}>
-          <Text style={s.body}>
-            {proj.projeto} — {proj.tipo} para {destinatario(proj)}.
-          </Text>
+          <Text style={s.body}>{linhaProjeto(proj)}</Text>
         </Block>
         <Block b={B.servicoInclui}>
           <Text style={s.body}>{blocos.servicoInclui}</Text>

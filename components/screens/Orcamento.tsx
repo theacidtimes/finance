@@ -9,7 +9,7 @@ import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
 import {
   metaProposta,
-  destinatario,
+  linhaProjeto,
   blocosProposta,
   parseFicha,
   serializarFicha,
@@ -445,7 +445,7 @@ export function Orcamento() {
         </div>
 
         <Bloco b={B.projeto} editando={editando}>
-          {proj.projeto} — {proj.tipo} para {destinatario(proj)}.
+          {linhaProjeto(proj)}
         </Bloco>
         <Bloco b={B.servicoInclui} editando={editando}>{area("servicoInclui", 16)}</Bloco>
         <Bloco b={B.entrega} editando={editando}>

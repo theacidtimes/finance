@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   metaProposta,
   destinatario,
+  linhaProjeto,
   blocosProposta,
   parseFicha,
   serializarFicha,
@@ -277,5 +278,71 @@ describe("destinatário no corpo da proposta", () => {
   it("cai no cliente quando não há marca", () => {
     expect(destinatario(proj())).toBe("Agência X");
     expect(destinatario(proj({ marca: "  " }))).toBe("Agência X");
+  });
+});
+
+describe("frase de abertura do bloco Projeto", () => {
+  it("o caso da reclamação: nem 'Outro', nem 'para' repetindo o nome do projeto", () => {
+    const p = proj({
+      projeto: "Wellhub - Check-in do Bem / Direitos e Finalização TV",
+      marca: "Wellhub",
+      tipo: "Outro",
+    });
+    expect(linhaProjeto(p)).toBe(
+      "Wellhub - Check-in do Bem / Direitos e Finalização TV."
+    );
+    expect(linhaProjeto(p)).not.toContain("Outro");
+    expect(linhaProjeto(p)).not.toContain("para");
+  });
+
+  it("com tipo de verdade e destinatário novo, a frase completa", () => {
+    expect(linhaProjeto(proj({ projeto: "Verão 2027", marca: "Vivo", tipo: "Filme" }))).toBe(
+      "Verão 2027 — Filme para Vivo."
+    );
+  });
+
+  it("'Outro' é opção de cadastro, não texto de proposta — some sempre", () => {
+    expect(linhaProjeto(proj({ projeto: "Verão 2027", marca: "Vivo", tipo: "Outro" }))).toBe(
+      "Verão 2027 para Vivo."
+    );
+  });
+
+  it("destinatário já citado no nome do projeto não se repete, mesmo com tipo", () => {
+    expect(linhaProjeto(proj({ projeto: "Vivo Verão", marca: "Vivo", tipo: "Filme" }))).toBe(
+      "Vivo Verão — Filme."
+    );
+  });
+
+  it("a comparação ignora acento e caixa", () => {
+    expect(linhaProjeto(proj({ projeto: "Campanha Natal", marca: "NATAL", tipo: "Outro" }))).toBe(
+      "Campanha Natal."
+    );
+    expect(linhaProjeto(proj({ projeto: "Ação de Verão", marca: "Acao", tipo: "Outro" }))).toBe(
+      "Ação de Verão."
+    );
+  });
+
+  it("nome parecido não é o mesmo nome — 'Vivocom' não contém 'Vivo'", () => {
+    expect(linhaProjeto(proj({ projeto: "Vivocom Verão", marca: "Vivo", tipo: "Filme" }))).toBe(
+      "Vivocom Verão — Filme para Vivo."
+    );
+  });
+
+  it("sem cliente para citar, cai no cliente do cadastro", () => {
+    expect(linhaProjeto(proj({ projeto: "Verão 2027", tipo: "Filme" }))).toBe(
+      "Verão 2027 — Filme para Agência X."
+    );
+  });
+
+  it("nome do projeto em branco não produz frase quebrada", () => {
+    expect(linhaProjeto(proj({ projeto: "  ", marca: "Vivo", tipo: "Outro" }))).toBe(
+      "Projeto para Vivo."
+    );
+  });
+
+  it("nunca sai com dois pontos finais", () => {
+    expect(linhaProjeto(proj({ projeto: "Verão 2027.", tipo: "Outro", marca: "Verão 2027" }))).toBe(
+      "Verão 2027."
+    );
   });
 });

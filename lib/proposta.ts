@@ -43,10 +43,53 @@ export function metaProposta(proj: Projeto): MetaProposta[] {
 
 /**
  * Para quem o trabalho é feito, na prática: a marca quando existe, senão o
- * cliente. Usado no corpo da proposta ("Projeto X — Filme para Y").
+ * cliente. Quem contrata é a agência; quem aparece no filme é a marca.
+ * Entra no corpo da proposta via `linhaProjeto`.
  */
 export function destinatario(proj: Projeto): string {
   return proj.marca?.trim() || proj.cliente;
+}
+
+/** Sem acento, minúsculo — para comparar nomes sem tropeçar em grafia. */
+const normal = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+/** `nome` já aparece em `texto` como palavra inteira? */
+function contemNome(texto: string, nome: string): boolean {
+  const n = normal(nome);
+  if (!n) return false;
+  const escapado = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escapado}([^a-z0-9]|$)`).test(normal(texto));
+}
+
+/**
+ * A frase de abertura do bloco "Projeto".
+ *
+ * Era `${projeto} — ${tipo} para ${destinatário}`, montada direto no JSX, e
+ * produzia coisas como "Wellhub - Check-in do Bem — Outro para Wellhub":
+ *  - "Outro" é a opção de escape do cadastro, não um tipo de peça. Não é algo
+ *    que se escreva para o cliente ler.
+ *  - o nome do projeto já começava com "Wellhub", então o "para Wellhub"
+ *    repetia — e o cabeçalho já traz cliente e marca logo acima.
+ *
+ * Então cada parte só entra quando acrescenta informação.
+ */
+export function linhaProjeto(proj: Projeto): string {
+  const nome = (proj.projeto || "").trim().replace(/[.\s]+$/, "");
+  const tipo = proj.tipo && proj.tipo !== "Outro" ? proj.tipo : "";
+  const para = destinatario(proj).trim();
+  // Repetir o nome que já está no título do projeto não informa nada.
+  const alvo = para && !contemNome(nome, para) ? para : "";
+
+  if (!nome) return alvo ? `Projeto para ${alvo}.` : "Projeto.";
+  if (tipo && alvo) return `${nome} — ${tipo} para ${alvo}.`;
+  if (tipo) return `${nome} — ${tipo}.`;
+  if (alvo) return `${nome} para ${alvo}.`;
+  return `${nome}.`;
 }
 
 /* ============================================================
