@@ -36,6 +36,8 @@ export function UsuariosAdmin({
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState<string | null>(null);
+  const [senhaDe, setSenhaDe] = useState<string | null>(null);
+  const [novaSenha, setNovaSenha] = useState("");
 
   const setPerm = (k: PermissionKey, v: boolean) =>
     setForm((f) => ({ ...f, permissions: { ...f.permissions, [k]: v } }));
@@ -83,6 +85,32 @@ export function UsuariosAdmin({
       router.refresh();
     } catch {
       toast.error("Não foi possível alterar a permissão.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Senha em texto claro, igual à "senha provisória" da criação: quem redefine
+  // precisa ler o valor para repassar à pessoa.
+  const trocarSenha = async (p: Perfil) => {
+    if (novaSenha.length < 6) {
+      toast.error("A senha precisa ter ao menos 6 caracteres.");
+      return;
+    }
+    setBusy(p.id);
+    try {
+      const res = await fetch("/api/usuarios", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, senha: novaSenha }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Falha ao trocar a senha.");
+      toast.success(`Senha de ${p.nome || p.email} redefinida.`);
+      setSenhaDe(null);
+      setNovaSenha("");
+    } catch (err) {
+      toast.error((err as Error).message);
     } finally {
       setBusy(null);
     }
@@ -283,15 +311,64 @@ export function UsuariosAdmin({
                     </td>
                   ))}
                   <td className="px-4 py-3 text-right whitespace-nowrap">
-                    {!isSelf && (
-                      <button
-                        onClick={() => remover(p)}
-                        disabled={disabled}
-                        className="text-xs text-muted-foreground hover:text-danger px-1.5 disabled:opacity-50"
-                        title="Apagar usuário"
-                      >
-                        Apagar
-                      </button>
+                    {senhaDe === p.id ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={novaSenha}
+                          onChange={(e) => setNovaSenha(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") trocarSenha(p);
+                            if (e.key === "Escape") {
+                              setSenhaDe(null);
+                              setNovaSenha("");
+                            }
+                          }}
+                          placeholder="nova senha (mín. 6)"
+                          className="w-44 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <button
+                          onClick={() => trocarSenha(p)}
+                          disabled={disabled}
+                          className="text-xs px-2.5 py-1.5 rounded-lg font-semibold text-neutral-900 bg-acid hover:opacity-90 disabled:opacity-50"
+                        >
+                          {disabled ? "Salvando…" : "Salvar"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSenhaDe(null);
+                            setNovaSenha("");
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground px-1.5"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSenhaDe(p.id);
+                            setNovaSenha("");
+                          }}
+                          disabled={disabled}
+                          className="text-xs text-muted-foreground hover:text-foreground px-1.5 disabled:opacity-50"
+                          title="Definir uma nova senha para este usuário"
+                        >
+                          Senha
+                        </button>
+                        {!isSelf && (
+                          <button
+                            onClick={() => remover(p)}
+                            disabled={disabled}
+                            className="text-xs text-muted-foreground hover:text-danger px-1.5 disabled:opacity-50"
+                            title="Apagar usuário"
+                          >
+                            Apagar
+                          </button>
+                        )}
+                      </>
                     )}
                   </td>
                 </tr>

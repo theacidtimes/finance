@@ -86,6 +86,41 @@ export async function POST(req: Request) {
   return NextResponse.json({ id: data.user.id });
 }
 
+// Trocar a senha de um usuário. O app não tem fluxo de recuperação por e-mail;
+// quem esquece a senha pede a um master para redefini-la aqui.
+export async function PATCH(req: Request) {
+  const gate = await requireMaster();
+  if ("error" in gate) return gate.error;
+
+  let body: { id?: string; senha?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
+  }
+
+  const id = (body.id ?? "").trim();
+  const senha = body.senha ?? "";
+  if (!id) return NextResponse.json({ error: "id obrigatório." }, { status: 400 });
+  if (senha.length < 6) {
+    return NextResponse.json(
+      { error: "A senha precisa ter ao menos 6 caracteres." },
+      { status: 400 }
+    );
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(id, { password: senha });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
+}
+
 // Apagar usuário
 export async function DELETE(req: Request) {
   const gate = await requireMaster();
