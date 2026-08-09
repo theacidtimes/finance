@@ -15,6 +15,7 @@ import type {
 } from "@/types";
 import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
+import { normalizaStatusProjeto } from "@/data/constants";
 
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
@@ -43,7 +44,7 @@ export function projectRowToProjeto(row: ProjectRow): Projeto {
     tipo: (row.tipo as TipoProjeto) ?? "Filme",
     responsavel: row.responsavel ?? "",
     data: row.data ?? "",
-    status: row.status ?? "Orçamento",
+    status: normalizaStatusProjeto(row.status),
     valorBruto: num(row.valor_bruto),
     impostosPct: num(row.impostos_pct),
     comissaoPct: num(row.comissao_pct),

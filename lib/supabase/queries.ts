@@ -29,6 +29,7 @@ import {
   clienteToClientInsert,
 } from "./mappers";
 import type { ProjetoBruto } from "@/lib/performance";
+import { contaNaCarteira, normalizaStatusProjeto } from "@/data/constants";
 
 export type DB = SupabaseClient<Database>;
 
@@ -73,7 +74,7 @@ export async function listProjects(db: DB): Promise<ProjetoResumo[]> {
     tipo: r.tipo,
     responsavel: r.responsavel ?? "",
     data: r.data ?? "",
-    status: r.status ?? "Orçamento",
+    status: normalizaStatusProjeto(r.status),
     valorBruto: Number(r.valor_bruto ?? 0),
     updatedAt: r.updated_at,
   }));
@@ -97,7 +98,7 @@ export async function listProjectsByClient(db: DB, clientId: string): Promise<Pr
     tipo: r.tipo,
     responsavel: r.responsavel ?? "",
     data: r.data ?? "",
-    status: r.status ?? "Orçamento",
+    status: normalizaStatusProjeto(r.status),
     valorBruto: Number(r.valor_bruto ?? 0),
     updatedAt: r.updated_at,
   }));
@@ -233,7 +234,7 @@ export async function deleteTeamMember(db: DB, id: string): Promise<void> {
 export async function listClientes(db: DB): Promise<ClienteResumo[]> {
   const [clientsRes, projRes] = await Promise.all([
     db.from("clients").select("*").order("nome", { ascending: true }),
-    db.from("projects").select("client_id, valor_bruto, updated_at"),
+    db.from("projects").select("client_id, valor_bruto, status, updated_at"),
   ]);
   if (clientsRes.error) throw clientsRes.error;
   if (projRes.error) throw projRes.error;
@@ -243,7 +244,8 @@ export async function listClientes(db: DB): Promise<ClienteResumo[]> {
     if (!p.client_id) continue;
     const cur = agg.get(p.client_id) ?? { n: 0, total: 0, ultima: "" };
     cur.n += 1;
-    cur.total += Number(p.valor_bruto ?? 0);
+    // Orçamento declinado continua listado no cliente, mas não soma na carteira.
+    if (contaNaCarteira(p.status)) cur.total += Number(p.valor_bruto ?? 0);
     if (p.updated_at && p.updated_at > cur.ultima) cur.ultima = p.updated_at;
     agg.set(p.client_id, cur);
   }
@@ -335,7 +337,7 @@ export async function listPerformanceDados(db: DB): Promise<{
       tipo: (r.tipo as Projeto["tipo"]) ?? "Filme",
       responsavel: r.responsavel ?? "",
       data: r.data ?? "",
-      status: r.status ?? "Orçamento",
+      status: normalizaStatusProjeto(r.status),
       valorBruto: Number(r.valor_bruto ?? 0),
       impostosPct: Number(r.impostos_pct ?? 0),
       comissaoPct: Number(r.comissao_pct ?? 0),

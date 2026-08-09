@@ -13,6 +13,7 @@ import {
   duplicateProject,
 } from "@/lib/supabase/queries";
 import { novoProjetoDefaults, BLOCOS_PADRAO } from "@/data/blocos";
+import { contaNaCarteira } from "@/data/constants";
 import { formatBRL0, formatDate } from "@/utils/format";
 import { AppShell } from "@/components/AppShell";
 import type { Cliente, Projeto } from "@/types";
@@ -23,7 +24,7 @@ const statusTone: Record<string, string> = {
   Aprovado: "bg-acid/15 text-acid-dark border-acid/30",
   "Em produção": "bg-blue-50 text-blue-700 border-blue-200",
   Entregue: "bg-neutral-100 text-neutral-600 border-neutral-300",
-  Perdido: "bg-red-50 text-danger border-red-200",
+  Declinado: "bg-red-50 text-danger border-red-200",
   Orçamento: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
@@ -115,7 +116,9 @@ export function ClienteDetalhe({
     }
   };
 
-  const total = projetos.reduce((s, p) => s + p.valorBruto, 0);
+  // Declinado fica na lista (histórico), mas fora do valor da carteira.
+  const total = projetos.reduce((s, p) => (contaNaCarteira(p.status) ? s + p.valorBruto : s), 0);
+  const nDeclinados = projetos.filter((p) => !contaNaCarteira(p.status)).length;
   const statusLabel =
     status === "saving" ? "Salvando…" : status === "error" ? "Erro ao salvar" : "Salvo";
   const statusColor =
@@ -146,6 +149,7 @@ export function ClienteDetalhe({
             </h1>
             <span className="text-xs text-muted-foreground tabular-nums">
               {projetos.length} projeto(s) · {formatBRL0(total)}
+              {nDeclinados > 0 && ` · ${nDeclinados} declinado(s) fora da soma`}
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
