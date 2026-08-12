@@ -93,9 +93,18 @@ export function FriendEditor({
     setConsultando(true);
     try {
       const resp = await fetch(`/api/cnpj/${d}`);
-      const json = (await resp.json()) as { receita?: DadosReceita; error?: string };
-      if (!resp.ok || !json.receita) {
-        toast.error(json.error ?? "Não foi possível consultar.");
+      // Lê como texto primeiro: se a resposta não for JSON (sessão expirada,
+      // proxy no caminho), o parse estouraria e o motivo real sumiria.
+      const bruto = await resp.text();
+      let json: { receita?: DadosReceita; error?: string } | null = null;
+      try {
+        json = JSON.parse(bruto) as { receita?: DadosReceita; error?: string };
+      } catch {
+        json = null;
+      }
+      if (!resp.ok || !json?.receita) {
+        console.error("[cnpj] resposta inesperada", resp.status, bruto.slice(0, 300));
+        toast.error(json?.error ?? `Não foi possível consultar (HTTP ${resp.status}).`);
         return;
       }
       const r = json.receita;

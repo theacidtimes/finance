@@ -5,14 +5,15 @@ import type { DadosReceita } from "@/types";
 export const dynamic = "force-dynamic";
 
 /**
- * Consulta de CNPJ na BrasilAPI (dados públicos da Receita).
+ * Consulta de CNPJ em fontes públicas da Receita (BrasilAPI, com Minha Receita
+ * como reserva — mesmos nomes de campo nas duas).
  *
  * Roda no servidor de propósito: mantém o browser fora de um terceiro e
- * permite filtrar o retorno. A BrasilAPI devolve o quadro societário completo,
+ * permite filtrar o retorno. As duas devolvem o quadro societário completo,
  * com CPF parcial e faixa etária dos sócios — nada disso é gravado ou
  * devolvido daqui; só o que o cadastro do Friend realmente usa.
  */
-type RespostaBrasilAPI = {
+type RespostaCNPJ = {
   razao_social?: string;
   nome_fantasia?: string;
   descricao_situacao_cadastral?: string;
@@ -38,31 +39,47 @@ export async function GET(_req: Request, ctx: { params: Promise<{ cnpj: string }
     return NextResponse.json({ error: "CNPJ precisa ter 14 dígitos." }, { status: 400 });
   }
 
-  let resp: Response;
-  try {
-    resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(15_000),
-      cache: "no-store",
-    });
-  } catch {
-    return NextResponse.json(
-      { error: "Serviço de consulta indisponível. Preencha à mão." },
-      { status: 503 }
-    );
+  // Duas fontes com o mesmo formato de resposta. A BrasilAPI é a primeira, mas
+  // ela limita por IP — e num IP compartilhado de serverless isso acontece sem
+  // aviso. Falhou, tenta a Minha Receita antes de desistir.
+  const FONTES = [
+    { nome: "brasilapi", url: `https://brasilapi.com.br/api/cnpj/v1/${cnpj}` },
+    { nome: "minhareceita", url: `https://minhareceita.org/${cnpj}` },
+  ];
+
+  let d: RespostaCNPJ | null = null;
+  const falhas: string[] = [];
+
+  for (const fonte of FONTES) {
+    try {
+      const resp = await fetch(fonte.url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+        cache: "no-store",
+      });
+      if (resp.status === 404) {
+        return NextResponse.json({ error: "CNPJ não encontrado na Receita." }, { status: 404 });
+      }
+      if (!resp.ok) {
+        falhas.push(`${fonte.nome} HTTP ${resp.status}`);
+        continue;
+      }
+      d = (await resp.json()) as RespostaCNPJ;
+      break;
+    } catch (e) {
+      falhas.push(`${fonte.nome} ${e instanceof Error ? e.message : "erro"}`);
+    }
   }
 
-  if (resp.status === 404) {
-    return NextResponse.json({ error: "CNPJ não encontrado na Receita." }, { status: 404 });
-  }
-  if (!resp.ok) {
+  if (!d) {
+    // Vai para os logs do servidor: sem isso, "não deu" na tela não diz se foi
+    // limite de requisições, timeout ou a fonte fora do ar.
+    console.error("[cnpj] consulta falhou", cnpj, falhas.join(" · "));
     return NextResponse.json(
-      { error: "Não foi possível consultar o CNPJ agora." },
+      { error: `Consulta indisponível (${falhas.join("; ")}). Preencha à mão.` },
       { status: 502 }
     );
   }
-
-  const d = (await resp.json()) as RespostaBrasilAPI;
   const cnae = [d.cnae_fiscal, d.cnae_fiscal_descricao].filter(Boolean).join(" — ");
 
   const receita: DadosReceita = {
