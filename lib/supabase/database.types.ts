@@ -41,6 +41,7 @@ export type Database = {
         Row: {
           categoria: string | null
           data_pagamento: string | null
+          friend_id: string | null
           funcao: string | null
           id: string
           nf: boolean
@@ -55,6 +56,7 @@ export type Database = {
         Insert: {
           categoria?: string | null
           data_pagamento?: string | null
+          friend_id?: string | null
           funcao?: string | null
           id?: string
           nf?: boolean
@@ -113,6 +115,60 @@ export type Database = {
           project_id: string
         }
         Update: Partial<Database["public"]["Tables"]["milestones"]["Insert"]>
+        Relationships: []
+      }
+      friends: {
+        Row: {
+          agencia: string
+          ativo: boolean
+          banco_codigo: string
+          banco_nome: string
+          categorias: Json
+          cnpj: string
+          conta: string
+          contato: string
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          nome: string
+          observacoes: string
+          pix: string
+          portfolio: string
+          razao_social: string
+          receita: Json | null
+          site: string
+          telefone: string
+          tipo: string
+          tipo_conta: string
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string
+          ativo?: boolean
+          banco_codigo?: string
+          banco_nome?: string
+          categorias?: Json
+          cnpj?: string
+          conta?: string
+          contato?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          nome?: string
+          observacoes?: string
+          pix?: string
+          portfolio?: string
+          razao_social?: string
+          receita?: Json | null
+          site?: string
+          telefone?: string
+          tipo?: string
+          tipo_conta?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["friends"]["Insert"]>
         Relationships: []
       }
       team_members: {

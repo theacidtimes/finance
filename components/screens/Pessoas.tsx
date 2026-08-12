@@ -5,15 +5,17 @@ import { Section, TextInput, NumInput, Select } from "@/components/ui/primitives
 import { useProjetoStore } from "@/lib/store";
 import { useDRE } from "@/lib/useDRE";
 import { createClient } from "@/lib/supabase/client";
-import { listTeam } from "@/lib/supabase/queries";
+import { listTeam, listFriends } from "@/lib/supabase/queries";
 import { custoMensalCarregado } from "@/lib/team";
 import { formatBRL0, formatBRL } from "@/utils/format";
-import type { CategoriaExterna, StatusCustoExterno, TeamMember } from "@/types";
+import {
+  CATEGORIAS_EXTERNAS,
+  type CategoriaExterna,
+  type Friend,
+  type StatusCustoExterno,
+  type TeamMember,
+} from "@/types";
 
-const CATEGORIAS: CategoriaExterna[] = [
-  "3D", "AI Designer", "Motion", "Motion AI", "GP", "Pós-produção", "Finalização",
-  "Cor", "Trilha", "Locução", "Retoque", "Produção", "Coordenação", "Reserva Técnica", "Outros",
-];
 const STATUS_EXT: StatusCustoExterno[] = ["Orçado", "Aprovado", "Pago"];
 
 const th = "text-left text-[11px] uppercase tracking-widest text-muted-foreground font-medium px-2 py-2";
@@ -33,6 +35,7 @@ export function Pessoas() {
   const updateInterno = useProjetoStore((s) => s.updateInterno);
   const removeInterno = useProjetoStore((s) => s.removeInterno);
   const addExterno = useProjetoStore((s) => s.addExterno);
+  const addExternoFromFriend = useProjetoStore((s) => s.addExternoFromFriend);
   const updateExterno = useProjetoStore((s) => s.updateExterno);
   const removeExterno = useProjetoStore((s) => s.removeExterno);
 
@@ -52,6 +55,21 @@ export function Pessoas() {
   }, [membros]);
 
   const ativos = useMemo(() => membros.filter((m) => m.ativo), [membros]);
+
+  // Cadastro Acid Friends — fonte dos fornecedores das linhas de custo externo.
+  const [friends, setFriends] = useState<Friend[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    listFriends(createClient())
+      .then((fs) => { if (vivo) setFriends(fs.filter((f) => f.ativo)); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
+  const friendDe = useMemo(() => {
+    const map = new Map(friends.map((f) => [f.id, f]));
+    return (id?: string | null) => (id ? map.get(id) : undefined);
+  }, [friends]);
 
   return (
     <div className="space-y-5">
@@ -158,9 +176,30 @@ export function Pessoas() {
       <Section
         title={`Custos externos / repasses — ${formatBRL0(dre.custosExternos)}`}
         right={
-          <button onClick={addExterno} className="text-sm px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-80">
-            + Externo
-          </button>
+          <div className="flex items-center gap-2">
+            <select
+              value=""
+              onChange={(e) => {
+                const f = friends.find((x) => x.id === e.target.value);
+                if (f) addExternoFromFriend(f);
+                e.target.value = "";
+              }}
+              className="border border-input rounded-md px-2 py-1.5 text-sm bg-card max-w-[220px]"
+            >
+              <option value="" disabled>
+                {friends.length ? "+ Do Friends…" : "Nenhum friend ativo"}
+              </option>
+              {friends.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
+                  {f.categorias.length ? ` · ${f.categorias.slice(0, 2).join(", ")}` : ""}
+                </option>
+              ))}
+            </select>
+            <button onClick={addExterno} className="text-sm px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-80">
+              + Avulso
+            </button>
+          </div>
         }
       >
         <div className="overflow-x-auto">
@@ -183,12 +222,44 @@ export function Pessoas() {
                 </td>
                 <td className={td}>—</td><td className={td}>—</td><td className={td}>—</td><td className={td}></td>
               </tr>
-              {externos.map((e) => (
+              {externos.map((e) => {
+                const friend = friendDe(e.friendId);
+                // Sinaliza no momento de orçar, não só na tela do cadastro:
+                // fornecedor sem CNPJ ativo ou sem conta trava o pagamento depois.
+                const problema =
+                  friend &&
+                  ((friend.receita && friend.receita.situacao !== "ATIVA") ||
+                    !friend.conta.bancoCodigo ||
+                    !friend.conta.conta);
+                return (
                 <tr key={e.id} className="border-b border-border/50">
-                  <td className={td}><TextInput value={e.nome} onChange={(v) => updateExterno(e.id, { nome: v })} /></td>
+                  <td className={td}>
+                    {friend ? (
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-medium truncate">{e.nome || friend.nome}</span>
+                        <button
+                          onClick={() => updateExterno(e.id, { friendId: null })}
+                          title="Vinculado ao cadastro Acid Friends — clique para desvincular"
+                          className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-acid/15 text-acid-dark border border-acid/30 shrink-0"
+                        >
+                          friend
+                        </button>
+                        {problema && (
+                          <span
+                            title="Situação na Receita ou conta bancária pendente — veja o cadastro"
+                            className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-danger border border-danger/30 shrink-0"
+                          >
+                            pendência
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <TextInput value={e.nome} onChange={(v) => updateExterno(e.id, { nome: v })} />
+                    )}
+                  </td>
                   <td className={td}><TextInput value={e.funcao} onChange={(v) => updateExterno(e.id, { funcao: v })} /></td>
                   <td className={td}>
-                    <Select value={e.categoria} onChange={(v) => updateExterno(e.id, { categoria: v as CategoriaExterna })} options={CATEGORIAS} className="py-1" />
+                    <Select value={e.categoria} onChange={(v) => updateExterno(e.id, { categoria: v as CategoriaExterna })} options={CATEGORIAS_EXTERNAS} className="py-1" />
                   </td>
                   <td className={`${td} w-32`}><NumInput value={e.valor} onChange={(v) => updateExterno(e.id, { valor: v })} /></td>
                   <td className={td}>
@@ -207,7 +278,8 @@ export function Pessoas() {
                     <button onClick={() => removeExterno(e.id)} className="text-muted-foreground hover:text-danger" aria-label="Remover">×</button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

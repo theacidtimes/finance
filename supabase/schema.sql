@@ -363,3 +363,60 @@ create policy "equipe le versoes"    on project_versions for select to authentic
 create policy "equipe cria versoes"  on project_versions for insert to authenticated with check (true);
 -- sem policy de update: versão é imutável por construção.
 create policy "master apaga versoes" on project_versions for delete to authenticated using (public.is_master());
+
+-- ========== ACID FRIENDS (fornecedores / parceiros) ==========
+-- Cadastro global de quem executa fora da ACID. Espelha o papel de team_members
+-- para o time interno: as linhas de custo externo do projeto apontam para cá,
+-- e é isso que faz "quanto já pagamos para o Fulano" existir sem digitar nada.
+-- Conta bancária é sempre no CNPJ do Friend — a ACID não paga em CPF, então
+-- não há campo de titular PF.
+create table if not exists friends (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+
+  nome text not null default '',
+  cnpj text not null default '',          -- só dígitos
+  razao_social text not null default '',
+  tipo text not null default 'Empresa',
+  ativo boolean not null default true,
+  categorias jsonb not null default '[]'::jsonb,  -- CategoriaExterna[]
+
+  contato text not null default '',
+  email text not null default '',
+  telefone text not null default '',
+  site text not null default '',
+  portfolio text not null default '',
+  observacoes text not null default '',
+
+  -- conta de recebimento
+  banco_codigo text not null default '',
+  banco_nome text not null default '',
+  agencia text not null default '',
+  conta text not null default '',
+  tipo_conta text not null default 'Corrente',
+  pix text not null default '',
+
+  -- retrato da consulta à Receita (com carimbo de quando foi consultado)
+  receita jsonb
+);
+
+-- CNPJ é a identidade do Friend: não pode haver dois cadastros do mesmo.
+-- Índice parcial porque o cadastro nasce vazio e só depois recebe o CNPJ.
+create unique index if not exists friends_cnpj_unique
+  on friends (cnpj) where cnpj <> '';
+
+drop trigger if exists friends_updated_at on friends;
+create trigger friends_updated_at before update on friends
+  for each row execute function set_updated_at();
+
+alter table friends enable row level security;
+create policy "equipe le friends"    on friends for select to authenticated using (true);
+create policy "equipe cria friends"  on friends for insert to authenticated with check (true);
+create policy "equipe edita friends" on friends for update to authenticated using (true);
+create policy "master apaga friends" on friends for delete to authenticated using (public.is_master());
+
+-- vínculo da linha de custo externo com o cadastro (null = avulso)
+alter table external_costs add column if not exists friend_id uuid references friends(id) on delete set null;
+create index if not exists idx_external_costs_friend on external_costs(friend_id);

@@ -9,6 +9,7 @@ import type {
   BlocosProposta,
   ProjetoArquivo,
   TeamMember,
+  Friend,
 } from "@/types";
 import type { ProjetoCompleto } from "@/lib/supabase/queries";
 import { SEED_ATTO } from "@/data/seed";
@@ -42,6 +43,7 @@ export interface ProjetoState {
   setProjField: <K extends keyof Projeto>(k: K, v: Projeto[K]) => void;
 
   addExterno: () => void;
+  addExternoFromFriend: (f: Friend) => void;
   updateExterno: (id: CustoExterno["id"], patch: Partial<CustoExterno>) => void;
   removeExterno: (id: CustoExterno["id"]) => void;
 
@@ -92,7 +94,27 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
     set((s) => ({
       externos: [
         ...s.externos,
-        { id: Date.now(), nome: "", funcao: "", categoria: "Outros", valor: 0, status: "Orçado", nf: false, dataPagamento: "", obs: "" },
+        { id: Date.now(), nome: "", funcao: "", categoria: "Outros", valor: 0, status: "Orçado", nf: false, dataPagamento: "", obs: "", friendId: null },
+      ],
+    })),
+  addExternoFromFriend: (f) =>
+    set((s) => ({
+      externos: [
+        ...s.externos,
+        {
+          id: Date.now(),
+          nome: f.nome,
+          funcao: f.categorias[0] ?? "",
+          // Um friend com uma entrega só já entra classificado; com várias,
+          // a escolha é do projeto e fica em "Outros" até alguém decidir.
+          categoria: f.categorias.length === 1 ? f.categorias[0] : "Outros",
+          valor: 0,
+          status: "Orçado",
+          nf: false,
+          dataPagamento: "",
+          obs: "",
+          friendId: f.id,
+        },
       ],
     })),
   updateExterno: (id, patch) =>

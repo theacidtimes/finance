@@ -3,10 +3,29 @@
 export type TipoProjeto = "Filme" | "KV" | "Social" | "Campanha" | "Outro";
 export type StatusCustoExterno = "Orçado" | "Aprovado" | "Pago";
 
+/**
+ * Taxonomia única de entrega: classifica tanto a linha de custo externo do
+ * projeto quanto o que cada Friend sabe fazer. Duas listas separadas fariam
+ * "quem faz retoque?" não bater com o que foi lançado no projeto.
+ * Só acrescente valores — os existentes já estão gravados em external_costs.
+ */
 export type CategoriaExterna =
-  | "3D" | "AI Designer" | "Motion" | "Motion AI" | "GP"
-  | "Pós-produção" | "Finalização" | "Cor" | "Trilha" | "Locução"
-  | "Retoque" | "Produção" | "Coordenação" | "Reserva Técnica" | "Outros";
+  | "3D" | "AI Designer" | "ComfyUI" | "Motion" | "Motion AI" | "GP"
+  | "Pós-produção" | "Finalização" | "Cor" | "Trilha" | "Locução" | "Áudio"
+  | "Retoque" | "Ilustração" | "Direção de Arte" | "Edição"
+  | "Produção" | "Coordenação" | "Atendimento"
+  | "Programação" | "UX Design"
+  | "Reserva Técnica" | "Outros";
+
+/** Ordem canônica para selects e filtros — mesma lista, um lugar só. */
+export const CATEGORIAS_EXTERNAS: CategoriaExterna[] = [
+  "3D", "AI Designer", "ComfyUI", "Motion", "Motion AI", "GP",
+  "Pós-produção", "Finalização", "Cor", "Trilha", "Locução", "Áudio",
+  "Retoque", "Ilustração", "Direção de Arte", "Edição",
+  "Produção", "Coordenação", "Atendimento",
+  "Programação", "UX Design",
+  "Reserva Técnica", "Outros",
+];
 
 export interface Projeto {
   id?: string;
@@ -46,6 +65,8 @@ export interface CustoExterno {
   nf: boolean;
   dataPagamento: string;
   obs: string;
+  /** Vínculo com o cadastro Acid Friends; null = fornecedor avulso. */
+  friendId?: string | null;
 }
 
 export interface StaffInterno {
@@ -141,6 +162,70 @@ export interface TeamMember {
   observacoes: string;
 
   anexos: TeamAnexo[];
+}
+
+/* ================= ACID FRIENDS (fornecedores / parceiros) ================= */
+
+export type TipoFriend = "Empresa" | "MEI" | "Freelancer PJ" | "Coletivo" | "Outro";
+
+export type TipoConta = "Corrente" | "Poupança" | "Pagamento";
+
+/**
+ * Conta de recebimento. Sempre no CNPJ do Friend — a ACID não paga em CPF,
+ * então não existe campo de titular pessoa física aqui de propósito.
+ */
+export interface ContaBancaria {
+  bancoCodigo: string; // COMPE, 3 dígitos
+  bancoNome: string;   // gravado junto: o nome no comprovante não pode depender da lista
+  agencia: string;
+  conta: string;
+  tipoConta: TipoConta;
+  pix: string;
+}
+
+/**
+ * Retrato da Receita no momento da consulta do CNPJ.
+ * `consultadoEm` não é enfeite: situação cadastral muda, e dado sem carimbo
+ * de data passa por atual quando já não é.
+ */
+export interface DadosReceita {
+  razaoSocial: string;
+  nomeFantasia: string;
+  situacao: string;      // ATIVA | BAIXADA | INAPTA | SUSPENSA | NULA
+  dataAbertura: string;  // ISO
+  cnaePrincipal: string;
+  porte: string;
+  municipio: string;
+  uf: string;
+  consultadoEm: string;  // ISO
+}
+
+export interface Friend {
+  id: string;
+  nome: string;        // como a ACID chama no dia a dia
+  cnpj: string;        // só dígitos
+  razaoSocial: string;
+  tipo: TipoFriend;
+  /** O que esse Friend entrega — mesma taxonomia dos custos externos. */
+  categorias: CategoriaExterna[];
+  ativo: boolean;
+
+  contato: string;
+  email: string;
+  telefone: string;
+  site: string;
+  portfolio: string;
+  observacoes: string;
+
+  conta: ContaBancaria;
+  receita: DadosReceita | null;
+}
+
+/** Friend com o que já passou por ele — derivado dos custos externos. */
+export interface FriendResumo extends Friend {
+  nProjetos: number;
+  totalFaturado: number;
+  ultimoProjeto: string; // ISO ou ""
 }
 
 /** Cliente — entidade de agrupamento de projetos/orçamentos */

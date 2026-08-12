@@ -14,6 +14,8 @@ import type {
   Role,
   VersaoResumo,
   OrigemVersao,
+  Friend,
+  FriendResumo,
 } from "@/types";
 import { computeDRE } from "@/lib/finance";
 import {
@@ -30,6 +32,8 @@ import {
   memberToTeamInsert,
   clientRowToCliente,
   clienteToClientInsert,
+  friendRowToFriend,
+  friendToFriendInsert,
 } from "./mappers";
 import type { ProjetoBruto } from "@/lib/performance";
 import { contaNaCarteira, normalizaStatusProjeto } from "@/data/constants";
@@ -422,6 +426,122 @@ export async function updateTeamMember(db: DB, member: TeamMember): Promise<void
 
 export async function deleteTeamMember(db: DB, id: string): Promise<void> {
   const { error } = await db.from("team_members").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ================= ACID FRIENDS ================= */
+
+export async function listFriends(db: DB): Promise<Friend[]> {
+  const { data, error } = await db
+    .from("friends")
+    .select("*")
+    .order("ativo", { ascending: false })
+    .order("nome", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(friendRowToFriend);
+}
+
+/**
+ * Friends com o que já passou por eles. O faturamento não é digitado: sai dos
+ * custos externos já lançados nos projetos, que agora apontam para o cadastro.
+ */
+export async function listFriendsResumo(db: DB): Promise<FriendResumo[]> {
+  const [friendsRes, custosRes, projRes] = await Promise.all([
+    db.from("friends").select("*").order("ativo", { ascending: false }).order("nome"),
+    db.from("external_costs").select("friend_id, valor, project_id"),
+    db.from("projects").select("id, data, updated_at"),
+  ]);
+  if (friendsRes.error) throw friendsRes.error;
+  if (custosRes.error) throw custosRes.error;
+  if (projRes.error) throw projRes.error;
+
+  const dataDoProjeto = new Map(
+    (projRes.data ?? []).map((p) => [p.id, p.data ?? p.updated_at ?? ""])
+  );
+
+  const agg = new Map<string, { total: number; projetos: Set<string>; ultimo: string }>();
+  for (const c of custosRes.data ?? []) {
+    if (!c.friend_id) continue;
+    const cur = agg.get(c.friend_id) ?? { total: 0, projetos: new Set<string>(), ultimo: "" };
+    cur.total += Number(c.valor ?? 0);
+    if (c.project_id) {
+      cur.projetos.add(c.project_id);
+      const d = dataDoProjeto.get(c.project_id) ?? "";
+      if (d > cur.ultimo) cur.ultimo = d;
+    }
+    agg.set(c.friend_id, cur);
+  }
+
+  return (friendsRes.data ?? []).map((row) => {
+    const f = friendRowToFriend(row);
+    const a = agg.get(f.id);
+    return {
+      ...f,
+      nProjetos: a ? a.projetos.size : 0,
+      totalFaturado: a ? a.total : 0,
+      ultimoProjeto: a ? a.ultimo : "",
+    };
+  });
+}
+
+export async function getFriend(db: DB, id: string): Promise<Friend> {
+  const { data, error } = await db.from("friends").select("*").eq("id", id).single();
+  if (error) throw error;
+  return friendRowToFriend(data);
+}
+
+/** Projetos em que este Friend entrou, com o que foi lançado em cada um. */
+export async function listProjetosDoFriend(
+  db: DB,
+  friendId: string
+): Promise<{ id: string; cliente: string; projeto: string; data: string; status: string; valor: number }[]> {
+  const { data: custos, error } = await db
+    .from("external_costs")
+    .select("project_id, valor")
+    .eq("friend_id", friendId);
+  if (error) throw error;
+
+  const porProjeto = new Map<string, number>();
+  for (const c of custos ?? []) {
+    if (!c.project_id) continue;
+    porProjeto.set(c.project_id, (porProjeto.get(c.project_id) ?? 0) + Number(c.valor ?? 0));
+  }
+  if (porProjeto.size === 0) return [];
+
+  const { data: projetos, error: errProj } = await db
+    .from("projects")
+    .select("id, cliente, projeto, data, status")
+    .in("id", [...porProjeto.keys()]);
+  if (errProj) throw errProj;
+
+  return (projetos ?? [])
+    .map((p) => ({
+      id: p.id,
+      cliente: p.cliente,
+      projeto: p.projeto,
+      data: p.data ?? "",
+      status: normalizaStatusProjeto(p.status),
+      valor: porProjeto.get(p.id) ?? 0,
+    }))
+    .sort((a, b) => (a.data < b.data ? 1 : -1));
+}
+
+export async function createFriend(db: DB, friend: Omit<Friend, "id">): Promise<string> {
+  const { data: user } = await db.auth.getUser();
+  const insert = { ...friendToFriendInsert(friend), created_by: user.user?.id ?? null };
+  const { data, error } = await db.from("friends").insert(insert).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function updateFriend(db: DB, friend: Friend): Promise<void> {
+  const { id, ...rest } = friend;
+  const { error } = await db.from("friends").update(friendToFriendInsert(rest)).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteFriend(db: DB, id: string): Promise<void> {
+  const { error } = await db.from("friends").delete().eq("id", id);
   if (error) throw error;
 }
 

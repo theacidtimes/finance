@@ -12,6 +12,10 @@ import type {
   Encargo,
   TeamAnexo,
   Cliente,
+  Friend,
+  TipoFriend,
+  TipoConta,
+  DadosReceita,
 } from "@/types";
 import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
@@ -29,6 +33,8 @@ type TeamRow = Database["public"]["Tables"]["team_members"]["Row"];
 type TeamInsert = Database["public"]["Tables"]["team_members"]["Insert"];
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
+type FriendRow = Database["public"]["Tables"]["friends"]["Row"];
+type FriendInsert = Database["public"]["Tables"]["friends"]["Insert"];
 
 const num = (v: number | null | undefined) => Number(v ?? 0);
 
@@ -101,6 +107,7 @@ export function externalRowToCusto(row: ExternalRow): CustoExterno {
     nf: row.nf,
     dataPagamento: row.data_pagamento ?? "",
     obs: row.obs ?? "",
+    friendId: row.friend_id ?? null,
   };
 }
 
@@ -120,6 +127,7 @@ export function custoToExternalInsert(
     nf: c.nf,
     data_pagamento: c.dataPagamento || null,
     obs: c.obs,
+    friend_id: c.friendId ?? null,
   };
 }
 
@@ -210,6 +218,62 @@ export function memberToTeamInsert(m: Omit<TeamMember, "id">): TeamInsert {
     data_admissao: m.dataAdmissao || null,
     observacoes: m.observacoes,
     anexos: m.anexos as unknown as TeamInsert["anexos"],
+  };
+}
+
+/* ---------------- ACID FRIENDS ---------------- */
+
+export function friendRowToFriend(row: FriendRow): Friend {
+  const categorias = Array.isArray(row.categorias)
+    ? (row.categorias as unknown as CategoriaExterna[])
+    : [];
+  return {
+    id: row.id,
+    nome: row.nome ?? "",
+    cnpj: row.cnpj ?? "",
+    razaoSocial: row.razao_social ?? "",
+    tipo: (row.tipo as TipoFriend) ?? "Empresa",
+    categorias,
+    ativo: row.ativo,
+    contato: row.contato ?? "",
+    email: row.email ?? "",
+    telefone: row.telefone ?? "",
+    site: row.site ?? "",
+    portfolio: row.portfolio ?? "",
+    observacoes: row.observacoes ?? "",
+    conta: {
+      bancoCodigo: row.banco_codigo ?? "",
+      bancoNome: row.banco_nome ?? "",
+      agencia: row.agencia ?? "",
+      conta: row.conta ?? "",
+      tipoConta: (row.tipo_conta as TipoConta) ?? "Corrente",
+      pix: row.pix ?? "",
+    },
+    receita: (row.receita as unknown as DadosReceita | null) ?? null,
+  };
+}
+
+export function friendToFriendInsert(f: Omit<Friend, "id">): FriendInsert {
+  return {
+    nome: f.nome,
+    cnpj: f.cnpj,
+    razao_social: f.razaoSocial,
+    tipo: f.tipo,
+    ativo: f.ativo,
+    categorias: f.categorias as unknown as FriendInsert["categorias"],
+    contato: f.contato,
+    email: f.email,
+    telefone: f.telefone,
+    site: f.site,
+    portfolio: f.portfolio,
+    observacoes: f.observacoes,
+    banco_codigo: f.conta.bancoCodigo,
+    banco_nome: f.conta.bancoNome,
+    agencia: f.conta.agencia,
+    conta: f.conta.conta,
+    tipo_conta: f.conta.tipoConta,
+    pix: f.conta.pix,
+    receita: f.receita as unknown as FriendInsert["receita"],
   };
 }
 

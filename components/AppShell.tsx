@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Users, ShieldCheck, TrendingUp, type LucideIcon } from "lucide-react";
+import {
+  LayoutGrid,
+  Users,
+  Handshake,
+  ShieldCheck,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePerfil } from "@/components/PerfilProvider";
 
@@ -21,6 +28,12 @@ const NAV: NavItem[] = [
     match: (p) => p === "/" || p.startsWith("/clientes"),
   },
   { href: "/time", label: "Time", icon: Users, match: (p) => p.startsWith("/time") },
+  {
+    href: "/friends",
+    label: "Friends",
+    icon: Handshake,
+    match: (p) => p.startsWith("/friends"),
+  },
 ];
 
 /** Rotas só de master — expõem salários, margens e bônus. */
