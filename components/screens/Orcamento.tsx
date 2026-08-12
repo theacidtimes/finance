@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { TextInput } from "@/components/ui/primitives";
 import { usePerfil } from "@/components/PerfilProvider";
 import { ImportarPedido } from "@/components/screens/ImportarPedido";
-import { useProjetoStore } from "@/lib/store";
+import { useProjetoStore, completoDoStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { criarVersao } from "@/lib/supabase/queries";
 import { useDRE } from "@/lib/useDRE";
 import {
   metaProposta,
@@ -316,6 +318,9 @@ export function Orcamento() {
       });
       downloadBlob(blob, `Proposta_${fileBase(proj)}.pdf`);
       toast.success("Proposta em PDF gerada.");
+      // O PDF é o número que sai para o cliente: vira versão no histórico.
+      // Falhar aqui não pode derrubar a exportação, que já aconteceu.
+      criarVersao(createClient(), completoDoStore(), { origem: "pdf" }).catch(() => {});
     } catch {
       toast.error("Não foi possível gerar o PDF.");
     } finally {

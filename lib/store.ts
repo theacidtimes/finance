@@ -10,6 +10,7 @@ import type {
   ProjetoArquivo,
   TeamMember,
 } from "@/types";
+import type { ProjetoCompleto } from "@/lib/supabase/queries";
 import { SEED_ATTO } from "@/data/seed";
 import { BLOCOS_PADRAO } from "@/data/blocos";
 import { custoMensalCarregado } from "@/lib/team";
@@ -58,6 +59,23 @@ export interface ProjetoState {
 
   hydrate: (data: Partial<ProjetoArquivo> & { id?: string }) => void;
   toArquivo: () => ProjetoArquivo;
+}
+
+/**
+ * Estado atual do projeto aberto, no formato que o banco espera.
+ * Fora do hook de propósito: é chamado dentro de handlers (salvar, gerar PDF,
+ * versionar), onde o que interessa é o valor do instante, não o do render.
+ */
+export function completoDoStore(): ProjetoCompleto {
+  const s = useProjetoStore.getState();
+  return {
+    id: s.id!,
+    proj: s.proj,
+    externos: s.externos,
+    internos: s.internos,
+    cronograma: s.cronograma,
+    blocos: s.blocos,
+  };
 }
 
 export const useProjetoStore = create<ProjetoState>((set, get) => ({

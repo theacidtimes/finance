@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { useProjetoStore } from "@/lib/store";
+import { useProjetoStore, completoDoStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
-import { saveProject, type ProjetoCompleto } from "@/lib/supabase/queries";
+import { saveProject, criarVersao, type ProjetoCompleto } from "@/lib/supabase/queries";
+import { HistoricoVersoes } from "@/components/HistoricoVersoes";
 import { Dashboard } from "@/components/screens/Dashboard";
 import { Cadastro } from "@/components/screens/Cadastro";
 import { Pessoas } from "@/components/screens/Pessoas";
@@ -26,18 +27,6 @@ const TABS: [TabId, string][] = [
 ];
 
 type SaveStatus = "saved" | "saving" | "error";
-
-function completoDoStore(): ProjetoCompleto {
-  const s = useProjetoStore.getState();
-  return {
-    id: s.id!,
-    proj: s.proj,
-    externos: s.externos,
-    internos: s.internos,
-    cronograma: s.cronograma,
-    blocos: s.blocos,
-  };
-}
 
 const sigOf = (c: Omit<ProjetoCompleto, "id">) =>
   JSON.stringify([c.proj, c.externos, c.internos, c.cronograma, c.blocos]);
@@ -62,9 +51,11 @@ export function ProjetoWorkspace({
 
   const readyRef = useRef(false);
   const lastSig = useRef("");
+  const lastStatus = useRef(initial.proj.status);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    lastStatus.current = initial.proj.status;
     hydrate({
       id: initial.id,
       proj: initial.proj,
@@ -93,6 +84,15 @@ export function ProjetoWorkspace({
         await saveProject(createClient(), completo);
         lastSig.current = snapshot;
         setStatus("saved");
+        // Mudar de status é um marco do orçamento (Aprovado, Declinado…) —
+        // vale um retrato. O resto do autosave não versiona.
+        if (completo.proj.status !== lastStatus.current) {
+          lastStatus.current = completo.proj.status;
+          criarVersao(createClient(), completo, {
+            origem: "status",
+            label: `Status: ${completo.proj.status}`,
+          }).catch(() => {});
+        }
         router.refresh();
       } catch {
         setStatus("error");
@@ -103,6 +103,16 @@ export function ProjetoWorkspace({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);
+
+  // Restaurar troca o projeto inteiro: re-hidrata o store e realinha a
+  // assinatura, senão o autosave dispararia de volta o que acabou de ser gravado.
+  const aoRestaurar = (restaurado: ProjetoCompleto) => {
+    hydrate(restaurado);
+    lastSig.current = sigOf(restaurado);
+    lastStatus.current = restaurado.proj.status;
+    setStatus("saved");
+    router.refresh();
+  };
 
   const statusLabel =
     status === "saving" ? "Salvando…" : status === "error" ? "Erro ao salvar" : "Salvo";
@@ -130,6 +140,7 @@ export function ProjetoWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <HistoricoVersoes projectId={initial.id} onRestaurado={aoRestaurar} />
             <span className={cn("text-xs tabular-nums", statusColor)}>{statusLabel}</span>
             <span className="text-xs text-neutral-400 hidden lg:inline">{userEmail}</span>
           </div>

@@ -273,6 +273,42 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>
         Relationships: []
       }
+      project_versions: {
+        Row: {
+          autor_email: string
+          created_at: string
+          created_by: string | null
+          custos_externos: number
+          id: string
+          label: string
+          lucro_operacional: number
+          margem_operacional: number
+          origem: string
+          project_id: string
+          snapshot: Json
+          status: string
+          valor_bruto: number
+          versao: number
+        }
+        Insert: {
+          autor_email?: string
+          created_at?: string
+          created_by?: string | null
+          custos_externos?: number
+          id?: string
+          label?: string
+          lucro_operacional?: number
+          margem_operacional?: number
+          origem?: string
+          project_id: string
+          snapshot: Json
+          status?: string
+          valor_bruto?: number
+          versao: number
+        }
+        Update: Partial<Database["public"]["Tables"]["project_versions"]["Insert"]>
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }

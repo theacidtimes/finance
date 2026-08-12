@@ -12,7 +12,10 @@ import type {
   Perfil,
   Permissions,
   Role,
+  VersaoResumo,
+  OrigemVersao,
 } from "@/types";
+import { computeDRE } from "@/lib/finance";
 import {
   projectRowToProjeto,
   projetoToProjectInsert,
@@ -187,6 +190,199 @@ export async function duplicateProject(db: DB, id: string): Promise<string> {
   const newId = await createProject(db, proj, full.blocos);
   await saveProject(db, { ...full, id: newId, proj });
   return newId;
+}
+
+/* ================= HISTÓRICO DE VERSÕES ================= */
+
+/** O que a versão guarda: o projeto inteiro, no formato do export JSON. */
+export type SnapshotProjeto = Omit<ProjetoCompleto, "id">;
+
+const RESUMO_VERSAO_COLS =
+  "id, versao, created_at, autor_email, origem, label, status, valor_bruto, custos_externos, lucro_operacional, margem_operacional";
+
+type VersaoResumoRow = {
+  id: string;
+  versao: number;
+  created_at: string;
+  autor_email: string;
+  origem: string;
+  label: string;
+  status: string;
+  valor_bruto: number;
+  custos_externos: number;
+  lucro_operacional: number;
+  margem_operacional: number;
+};
+
+function versaoRowToResumo(r: VersaoResumoRow): VersaoResumo {
+  return {
+    id: r.id,
+    versao: r.versao,
+    criadoEm: r.created_at,
+    autorEmail: r.autor_email ?? "",
+    origem: (["pdf", "status", "manual", "restauracao"].includes(r.origem)
+      ? r.origem
+      : "manual") as OrigemVersao,
+    label: r.label ?? "",
+    status: r.status ?? "",
+    valorBruto: Number(r.valor_bruto ?? 0),
+    custosExternos: Number(r.custos_externos ?? 0),
+    lucroOperacional: Number(r.lucro_operacional ?? 0),
+    margemOperacional: Number(r.margem_operacional ?? 0),
+  };
+}
+
+export function snapshotDoProjeto(state: ProjetoCompleto): SnapshotProjeto {
+  return {
+    proj: state.proj,
+    externos: state.externos,
+    internos: state.internos,
+    cronograma: state.cronograma,
+    blocos: state.blocos,
+  };
+}
+
+/**
+ * Assinatura estável do snapshot, usada só para não gravar versão repetida.
+ * `JSON.stringify` direto não serve: o jsonb do Postgres devolve as chaves em
+ * outra ordem, então dois snapshots idênticos gerariam strings diferentes.
+ */
+function sigCanonica(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+  if (Array.isArray(v)) return `[${v.map(sigCanonica).join(",")}]`;
+  const obj = v as Record<string, unknown>;
+  const chaves = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  return `{${chaves.map((k) => `${JSON.stringify(k)}:${sigCanonica(obj[k])}`).join(",")}}`;
+}
+
+export async function listVersoes(db: DB, projectId: string): Promise<VersaoResumo[]> {
+  const { data, error } = await db
+    .from("project_versions")
+    .select(RESUMO_VERSAO_COLS)
+    .eq("project_id", projectId)
+    .order("versao", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => versaoRowToResumo(r as VersaoResumoRow));
+}
+
+export async function getVersaoSnapshot(db: DB, versaoId: string): Promise<SnapshotProjeto> {
+  const { data, error } = await db
+    .from("project_versions")
+    .select("snapshot")
+    .eq("id", versaoId)
+    .single();
+  if (error) throw error;
+  return data.snapshot as unknown as SnapshotProjeto;
+}
+
+/**
+ * Grava uma versão do projeto. Versões automáticas (PDF, status) são
+ * ignoradas quando nada mudou desde a última — dois cliques em "Gerar PDF"
+ * não viram duas linhas iguais. Versão manual sempre grava.
+ * Retorna null quando não gravou.
+ */
+export async function criarVersao(
+  db: DB,
+  state: ProjetoCompleto,
+  opts: { origem: OrigemVersao; label?: string }
+): Promise<VersaoResumo | null> {
+  const snapshot = snapshotDoProjeto(state);
+
+  const { data: ultima, error: errUltima } = await db
+    .from("project_versions")
+    .select("versao, snapshot")
+    .eq("project_id", state.id)
+    .order("versao", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (errUltima) throw errUltima;
+
+  if (opts.origem !== "manual" && ultima) {
+    if (sigCanonica(ultima.snapshot) === sigCanonica(snapshot)) return null;
+  }
+
+  const dre = computeDRE({
+    valorBruto: state.proj.valorBruto,
+    impostosPct: state.proj.impostosPct,
+    comissaoPct: state.proj.comissaoPct,
+    overheadPct: state.proj.overheadPct,
+    externos: state.externos,
+    internos: state.internos,
+  });
+
+  const { data: user } = await db.auth.getUser();
+  const base = {
+    project_id: state.id,
+    created_by: user.user?.id ?? null,
+    autor_email: user.user?.email ?? "",
+    origem: opts.origem,
+    label: opts.label ?? "",
+    status: state.proj.status,
+    valor_bruto: state.proj.valorBruto,
+    custos_externos: dre.custosExternos,
+    lucro_operacional: dre.lucroOperacional,
+    margem_operacional: dre.margemOperacional,
+    snapshot: snapshot as unknown as Database["public"]["Tables"]["project_versions"]["Insert"]["snapshot"],
+  };
+
+  // Numeração sequencial por projeto. Duas abas gerando PDF ao mesmo tempo
+  // colidem na unique (project_id, versao) — nesse caso relê o topo e repete.
+  let proximo = (ultima?.versao ?? 0) + 1;
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const { data, error } = await db
+      .from("project_versions")
+      .insert({ ...base, versao: proximo })
+      .select(RESUMO_VERSAO_COLS)
+      .single();
+    if (!error) return versaoRowToResumo(data as VersaoResumoRow);
+    if (error.code !== "23505") throw error;
+    const { data: topo } = await db
+      .from("project_versions")
+      .select("versao")
+      .eq("project_id", state.id)
+      .order("versao", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    proximo = (topo?.versao ?? proximo) + 1;
+  }
+  throw new Error("Não foi possível numerar a versão.");
+}
+
+/**
+ * Restaura uma versão sobre o projeto atual.
+ *
+ * O estado de agora é gravado antes como versão — restaurar nunca perde nada,
+ * e desfazer uma restauração errada é só restaurar de novo.
+ */
+export async function restaurarVersao(
+  db: DB,
+  projectId: string,
+  versaoId: string
+): Promise<ProjetoCompleto> {
+  const [atual, alvoResumo] = await Promise.all([
+    getProject(db, projectId),
+    db
+      .from("project_versions")
+      .select("versao, snapshot")
+      .eq("id", versaoId)
+      .single()
+      .then((r) => {
+        if (r.error) throw r.error;
+        return r.data;
+      }),
+  ]);
+
+  await criarVersao(db, atual, {
+    origem: "restauracao",
+    label: `Antes de restaurar a V${alvoResumo.versao}`,
+  });
+
+  const snapshot = alvoResumo.snapshot as unknown as SnapshotProjeto;
+  const restaurado: ProjetoCompleto = { id: projectId, ...snapshot };
+  await saveProject(db, restaurado);
+  return restaurado;
 }
 
 /* ================= TIME / FUNCIONÁRIOS ================= */

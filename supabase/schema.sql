@@ -326,3 +326,40 @@ create policy "briefings le"    on storage.objects for select to authenticated u
 create policy "briefings cria"  on storage.objects for insert to authenticated with check (bucket_id = 'briefings');
 create policy "briefings edita" on storage.objects for update to authenticated using (bucket_id = 'briefings');
 create policy "briefings apaga" on storage.objects for delete to authenticated using (bucket_id = 'briefings');
+
+-- ========== HISTÓRICO DE VERSÕES DO ORÇAMENTO ==========
+-- Cada linha é um retrato imutável do projeto inteiro num marco (PDF gerado,
+-- mudança de status, versão salva à mão). O autosave NÃO versiona: senão o
+-- histórico vira 200 linhas iguais e deixa de ser legível.
+-- O snapshot usa o mesmo formato do export JSON:
+--   { proj, externos, internos, cronograma, blocos }
+-- Os campos de resumo são denormalizados só para listar sem abrir o jsonb.
+create table if not exists project_versions (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  versao int not null,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+  autor_email text not null default '',
+  origem text not null default 'manual'
+    check (origem in ('manual','pdf','status','restauracao')),
+  label text not null default '',
+  status text not null default '',
+
+  valor_bruto numeric(14,2) not null default 0,
+  custos_externos numeric(14,2) not null default 0,
+  lucro_operacional numeric(14,2) not null default 0,
+  margem_operacional numeric(8,5) not null default 0,
+
+  snapshot jsonb not null,
+
+  unique (project_id, versao)
+);
+create index if not exists idx_project_versions_project
+  on project_versions (project_id, versao desc);
+
+alter table project_versions enable row level security;
+create policy "equipe le versoes"    on project_versions for select to authenticated using (true);
+create policy "equipe cria versoes"  on project_versions for insert to authenticated with check (true);
+-- sem policy de update: versão é imutável por construção.
+create policy "master apaga versoes" on project_versions for delete to authenticated using (public.is_master());

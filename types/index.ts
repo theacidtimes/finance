@@ -183,6 +183,32 @@ export const PERMISSOES: { key: PermissionKey; label: string; desc: string }[] =
   { key: "gerar_orcamento", label: "Gerar orçamento", desc: "Pode exportar a proposta em PDF" },
 ];
 
+/* ================= HISTÓRICO DE VERSÕES DO ORÇAMENTO ================= */
+
+/**
+ * Por que a versão foi criada.
+ * - `pdf`         — proposta exportada; é o número que saiu para o cliente
+ * - `status`      — projeto mudou de status (Aprovado, Declinado…)
+ * - `manual`      — alguém clicou em "Salvar versão"
+ * - `restauracao` — retrato do estado anterior, gravado antes de restaurar
+ */
+export type OrigemVersao = "pdf" | "status" | "manual" | "restauracao";
+
+/** Linha do histórico — o resumo que a lista mostra, sem abrir o snapshot. */
+export interface VersaoResumo {
+  id: string;
+  versao: number;
+  criadoEm: string; // ISO
+  autorEmail: string;
+  origem: OrigemVersao;
+  label: string;
+  status: string;
+  valorBruto: number;
+  custosExternos: number;
+  lucroOperacional: number;
+  margemOperacional: number; // 0–1
+}
+
 /** Formato do arquivo JSON de projeto (compatível com o protótipo) */
 export interface ProjetoArquivo {
   app: "acid-finance";
