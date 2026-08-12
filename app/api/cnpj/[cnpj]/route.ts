@@ -5,6 +5,14 @@ import type { DadosReceita } from "@/types";
 export const dynamic = "force-dynamic";
 
 /**
+ * São Paulo. As duas fontes são brasileiras e limitam por IP de origem — o
+ * padrão da Vercel (Washington) é justamente de onde chega mais tráfego
+ * automatizado, e é o que estava sendo recusado. Vale só para esta rota: as
+ * demais continuam perto do banco, em us-west.
+ */
+export const preferredRegion = "gru1";
+
+/**
  * Consulta de CNPJ em fontes públicas da Receita (BrasilAPI, com Minha Receita
  * como reserva — mesmos nomes de campo nas duas).
  *
