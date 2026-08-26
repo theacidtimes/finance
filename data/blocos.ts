@@ -1,6 +1,9 @@
 import type { BlocosProposta } from "@/types";
 
 export const BLOCOS_PADRAO: BlocosProposta = {
+  // Vazio de propósito: a proposta cai na frase derivada de `linhaProjeto`,
+  // que é como toda proposta da ACID abre hoje.
+  projeto: ``,
   servicoInclui: `1. A.I Concepting e direção
 - Direção criativa e desenvolvimento visual
 - Desenho de cenas, cenários e frames com uso de IA
@@ -53,6 +56,7 @@ export function novoProjetoDefaults() {
     prazo: "",
     condicaoPagamento: "",
     validadeProposta: "15 dias",
+    custoCambioPct: 1.88, // spread 0,78 + IOF 1,10 — ver lib/moeda.ts
     observacoes: "",
     titulo: "",
     roteiroUrl: "",

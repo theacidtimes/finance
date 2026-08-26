@@ -16,10 +16,13 @@ import type {
   TipoFriend,
   TipoConta,
   DadosReceita,
+  MoedaProposta,
+  OpcaoComercial,
 } from "@/types";
 import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
 import { normalizaStatusProjeto } from "@/data/constants";
+import { MOEDAS } from "@/lib/moeda";
 
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
@@ -29,6 +32,8 @@ type StaffRow = Database["public"]["Tables"]["internal_staff"]["Row"];
 type StaffInsert = Database["public"]["Tables"]["internal_staff"]["Insert"];
 type MilestoneRow = Database["public"]["Tables"]["milestones"]["Row"];
 type MilestoneInsert = Database["public"]["Tables"]["milestones"]["Insert"];
+type OptionRow = Database["public"]["Tables"]["proposal_options"]["Row"];
+type OptionInsert = Database["public"]["Tables"]["proposal_options"]["Insert"];
 type TeamRow = Database["public"]["Tables"]["team_members"]["Row"];
 type TeamInsert = Database["public"]["Tables"]["team_members"]["Insert"];
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
@@ -62,6 +67,15 @@ export function projectRowToProjeto(row: ProjectRow): Projeto {
     titulo: row.titulo ?? "",
     roteiroUrl: row.roteiro_url ?? "",
     roteiroLabel: row.roteiro_label ?? "",
+    // Linhas gravadas antes da proposta internacional não têm as colunas —
+    // caem no padrão da ACID: português, em real.
+    idiomaProposta: row.idioma_proposta === "en" ? "en" : "pt",
+    moeda: (MOEDAS as readonly string[]).includes(row.moeda) ? (row.moeda as MoedaProposta) : "BRL",
+    valorMoeda: num(row.valor_moeda),
+    cambio: num(row.cambio),
+    cambioData: row.cambio_data ?? "",
+    custoCambioPct: num(row.custo_cambio_pct),
+    semClausulaIA: Boolean(row.sem_clausula_ia),
   };
 }
 
@@ -88,6 +102,13 @@ export function projetoToProjectInsert(proj: Projeto): ProjectInsert {
     titulo: proj.titulo,
     roteiro_url: proj.roteiroUrl ?? "",
     roteiro_label: proj.roteiroLabel ?? "",
+    idioma_proposta: proj.idiomaProposta ?? "pt",
+    moeda: proj.moeda ?? "BRL",
+    valor_moeda: proj.valorMoeda ?? 0,
+    cambio: proj.cambio ?? 0,
+    cambio_data: proj.cambioData ?? "",
+    custo_cambio_pct: proj.custoCambioPct ?? 1.88,
+    sem_clausula_ia: Boolean(proj.semClausulaIA),
   };
 }
 
@@ -170,6 +191,35 @@ export function marcoToMilestoneInsert(
   ordem: number
 ): MilestoneInsert {
   return { project_id: projectId, ordem, data_label: m.data, marco: m.marco };
+}
+
+/* ---------------- OPÇÕES COMERCIAIS ---------------- */
+
+export function optionRowToOpcao(row: OptionRow): OpcaoComercial {
+  return {
+    id: row.id,
+    label: row.label ?? "",
+    quantidade: num(row.quantidade),
+    valorUnitario: num(row.valor_unitario),
+    valorTotal: num(row.valor_total),
+    escolhida: Boolean(row.escolhida),
+  };
+}
+
+export function opcaoToOptionInsert(
+  o: OpcaoComercial,
+  projectId: string,
+  ordem: number
+): OptionInsert {
+  return {
+    project_id: projectId,
+    ordem,
+    label: o.label,
+    quantidade: o.quantidade,
+    valor_unitario: o.valorUnitario,
+    valor_total: o.valorTotal,
+    escolhida: o.escolhida,
+  };
 }
 
 /* ---------------- TIME / FUNCIONÁRIOS ---------------- */

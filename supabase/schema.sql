@@ -52,11 +52,33 @@ create table if not exists projects (
   roteiro_url text default '',
   roteiro_label text default '',
 
+  -- proposta internacional: idioma e moeda são do DOCUMENTO, não da apuração.
+  -- valor_bruto continua sempre em real (= valor_moeda × cambio) porque é o
+  -- número que DRE, carteira, dashboard e performance somam.
+  idioma_proposta text not null default 'pt' check (idioma_proposta in ('pt','en')),
+  moeda text not null default 'BRL' check (moeda in ('BRL','EUR','GBP','USD')),
+  valor_moeda numeric(14,2) not null default 0,
+  cambio numeric(12,6) not null default 0,
+  cambio_data text not null default '',
+  -- spread bancário + IOF sobre o câmbio comercial; despesa financeira, não imposto
+  custo_cambio_pct numeric(6,3) not null default 1.88,
+  -- tira a cláusula de IA do documento; decisão registrada, não texto apagado
+  sem_clausula_ia boolean not null default false,
+
   -- blocos de texto da proposta comercial (JSON: BlocosProposta)
   blocos jsonb not null default '{}'::jsonb,
 
   unique (cliente, projeto, numero_servico)
 );
+
+-- migração idempotente p/ bancos já criados (proposta internacional)
+alter table projects add column if not exists idioma_proposta text not null default 'pt';
+alter table projects add column if not exists moeda           text not null default 'BRL';
+alter table projects add column if not exists valor_moeda     numeric(14,2) not null default 0;
+alter table projects add column if not exists cambio          numeric(12,6) not null default 0;
+alter table projects add column if not exists cambio_data     text not null default '';
+alter table projects add column if not exists custo_cambio_pct numeric(6,3) not null default 1.88;
+alter table projects add column if not exists sem_clausula_ia boolean not null default false;
 
 -- migração idempotente p/ bancos já criados (link do roteiro aprovado)
 alter table projects add column if not exists roteiro_url   text default '';
@@ -103,6 +125,21 @@ create table if not exists milestones (
   ordem int not null default 0,
   data_label text not null default '',
   marco text not null default ''
+);
+
+-- ========== OPÇÕES COMERCIAIS ==========
+-- Proposta com mais de um preço (sprint por diárias, pacotes). O projeto segue
+-- com um `valor_bruto` só: a opção `escolhida` quando o cliente fecha, a menor
+-- enquanto não fecha. Ver lib/opcoes.ts.
+create table if not exists proposal_options (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  ordem int not null default 0,
+  label text not null default '',
+  quantidade numeric(10,2) not null default 0,
+  valor_unitario numeric(14,2) not null default 0,
+  valor_total numeric(14,2) not null default 0,
+  escolhida boolean not null default false
 );
 
 -- ========== TIME / FUNCIONÁRIOS ACID (global, fora de projetos) ==========
@@ -244,6 +281,7 @@ alter table projects enable row level security;
 alter table external_costs enable row level security;
 alter table internal_staff enable row level security;
 alter table milestones enable row level security;
+alter table proposal_options enable row level security;
 
 create policy "equipe le projetos"    on projects for select to authenticated using (true);
 create policy "equipe cria projetos"  on projects for insert to authenticated with check (true);
@@ -265,6 +303,11 @@ create policy "equipe cria marcos"  on milestones for insert to authenticated wi
 create policy "equipe edita marcos" on milestones for update to authenticated using (true);
 create policy "equipe apaga marcos" on milestones for delete to authenticated using (true);
 
+create policy "equipe le opcoes"    on proposal_options for select to authenticated using (true);
+create policy "equipe cria opcoes"  on proposal_options for insert to authenticated with check (true);
+create policy "equipe edita opcoes" on proposal_options for update to authenticated using (true);
+create policy "equipe apaga opcoes" on proposal_options for delete to authenticated using (true);
+
 alter table team_members enable row level security;
 create policy "equipe le time"    on team_members for select to authenticated using (true);
 create policy "equipe cria time"  on team_members for insert to authenticated with check (true);
@@ -275,6 +318,7 @@ create policy "equipe apaga time" on team_members for delete to authenticated us
 create index if not exists idx_external_costs_project on external_costs(project_id);
 create index if not exists idx_internal_staff_project on internal_staff(project_id);
 create index if not exists idx_milestones_project on milestones(project_id);
+create index if not exists idx_proposal_options_project on proposal_options(project_id);
 create index if not exists idx_team_members_ativo on team_members(ativo);
 
 -- ========== STORAGE: contratos/anexos do time ==========

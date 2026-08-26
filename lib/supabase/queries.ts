@@ -5,6 +5,7 @@ import type {
   CustoExterno,
   StaffInterno,
   MarcoCronograma,
+  OpcaoComercial,
   BlocosProposta,
   TeamMember,
   Cliente,
@@ -28,6 +29,8 @@ import {
   internoToStaffInsert,
   milestoneRowToMarco,
   marcoToMilestoneInsert,
+  optionRowToOpcao,
+  opcaoToOptionInsert,
   teamRowToMember,
   memberToTeamInsert,
   clientRowToCliente,
@@ -61,6 +64,7 @@ export interface ProjetoCompleto {
   externos: CustoExterno[];
   internos: StaffInterno[];
   cronograma: MarcoCronograma[];
+  opcoes: OpcaoComercial[];
   blocos: BlocosProposta;
 }
 
@@ -115,14 +119,16 @@ export async function getProject(db: DB, id: string): Promise<ProjetoCompleto> {
   const { data: row, error } = await db.from("projects").select("*").eq("id", id).single();
   if (error) throw error;
 
-  const [ext, staff, mile] = await Promise.all([
+  const [ext, staff, mile, opt] = await Promise.all([
     db.from("external_costs").select("*").eq("project_id", id).order("ordem"),
     db.from("internal_staff").select("*").eq("project_id", id).order("ordem"),
     db.from("milestones").select("*").eq("project_id", id).order("ordem"),
+    db.from("proposal_options").select("*").eq("project_id", id).order("ordem"),
   ]);
   if (ext.error) throw ext.error;
   if (staff.error) throw staff.error;
   if (mile.error) throw mile.error;
+  if (opt.error) throw opt.error;
 
   return {
     id: row.id,
@@ -130,6 +136,7 @@ export async function getProject(db: DB, id: string): Promise<ProjetoCompleto> {
     externos: (ext.data ?? []).map(externalRowToCusto),
     internos: (staff.data ?? []).map(staffRowToInterno),
     cronograma: (mile.data ?? []).map(milestoneRowToMarco),
+    opcoes: (opt.data ?? []).map(optionRowToOpcao),
     blocos: blocosFromRow(row),
   };
 }
@@ -164,16 +171,19 @@ export async function saveProject(db: DB, state: ProjetoCompleto): Promise<void>
     db.from("external_costs").delete().eq("project_id", id),
     db.from("internal_staff").delete().eq("project_id", id),
     db.from("milestones").delete().eq("project_id", id),
+    db.from("proposal_options").delete().eq("project_id", id),
   ]);
 
   const extRows = state.externos.map((c, i) => custoToExternalInsert(c, id, i));
   const staffRows = state.internos.map((s, i) => internoToStaffInsert(s, id, i));
   const mileRows = state.cronograma.map((m, i) => marcoToMilestoneInsert(m, id, i));
+  const optRows = (state.opcoes ?? []).map((o, i) => opcaoToOptionInsert(o, id, i));
 
   const results = await Promise.all([
     extRows.length ? db.from("external_costs").insert(extRows) : Promise.resolve({ error: null }),
     staffRows.length ? db.from("internal_staff").insert(staffRows) : Promise.resolve({ error: null }),
     mileRows.length ? db.from("milestones").insert(mileRows) : Promise.resolve({ error: null }),
+    optRows.length ? db.from("proposal_options").insert(optRows) : Promise.resolve({ error: null }),
   ]);
   for (const r of results) if (r.error) throw r.error;
 }
@@ -242,6 +252,7 @@ export function snapshotDoProjeto(state: ProjetoCompleto): SnapshotProjeto {
     externos: state.externos,
     internos: state.internos,
     cronograma: state.cronograma,
+    opcoes: state.opcoes,
     blocos: state.blocos,
   };
 }

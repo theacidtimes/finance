@@ -27,6 +27,18 @@ export const CATEGORIAS_EXTERNAS: CategoriaExterna[] = [
   "Reserva Técnica", "Outros",
 ];
 
+/**
+ * Moeda em que a proposta é apresentada ao cliente.
+ *
+ * É uma decisão do DOCUMENTO, não do DRE: o projeto continua sendo apurado em
+ * real. Ver `cambio` — sem ele, um projeto em euro entraria na carteira e no
+ * dashboard somando 50.000 lado a lado com reais, sem ninguém perceber.
+ */
+export type MoedaProposta = "BRL" | "EUR" | "GBP" | "USD";
+
+/** Idioma dos textos da proposta. Não muda o idioma do sistema. */
+export type IdiomaProposta = "pt" | "en";
+
 export interface Projeto {
   id?: string;
   /** Quem contrata e paga a ACID — muitas vezes uma agência. */
@@ -53,6 +65,32 @@ export interface Projeto {
   titulo: string; // título comercial da proposta
   roteiroUrl?: string;   // link do roteiro aprovado (Google Docs/Slides/Drive) — "lock" do escopo
   roteiroLabel?: string; // rótulo do link (ex.: "Roteiro v3 — aprovado 20/07")
+
+  /* --- Proposta internacional. Só afetam o documento; o DRE segue em BRL. --- */
+  /** Idioma dos textos da proposta. Ausente = "pt". */
+  idiomaProposta?: IdiomaProposta;
+  /** Moeda exibida ao cliente. Ausente = "BRL". */
+  moeda?: MoedaProposta;
+  /** Valor bruto na moeda da proposta. Só usado quando `moeda` ≠ BRL. */
+  valorMoeda?: number;
+  /** Reais por 1 unidade da moeda, travado na data da proposta. `valorBruto` = valorMoeda × cambio. */
+  cambio?: number;
+  /** Quando a taxa foi capturada — o câmbio é de um dia, não de sempre. */
+  cambioData?: string;
+  /**
+   * Spread bancário + IOF, em % sobre o câmbio comercial. Padrão 1,88.
+   * Despesa financeira da operação — não é imposto sobre a receita.
+   */
+  custoCambioPct?: number;
+
+  /**
+   * Tira a cláusula de IA do documento.
+   *
+   * Ela é bloco fixo justamente porque quase nunca deve sair. Fica como opção
+   * explícita por projeto, e não como bloco editável, para que tirá-la seja uma
+   * decisão registrada — e não algo que se apaga sem querer.
+   */
+  semClausulaIA?: boolean;
 }
 
 export interface CustoExterno {
@@ -84,6 +122,27 @@ export interface StaffInternoCalc extends StaffInterno {
   custoProjeto: number; // custoHora * horasProjeto
 }
 
+/**
+ * Uma linha da tabela de opções comerciais.
+ *
+ * Proposta de sprint não tem um preço: tem uma grade (2 dias, 3 dias, 5 dias),
+ * e o cliente escolhe. Enquanto ele não escolhe, o projeto ainda precisa de UM
+ * número para o DRE, a carteira e o dashboard — ver `valorDaProposta`.
+ */
+export interface OpcaoComercial {
+  id: string | number;
+  /** Como a linha aparece na proposta: "2 days", "Pacote anual". */
+  label: string;
+  /** Quantidade da unidade cobrada (diárias, peças). 0 = não exibir. */
+  quantidade: number;
+  /** Preço da unidade. 0 = não exibir a coluna. */
+  valorUnitario: number;
+  /** Total da linha — é o que vira `valorBruto` quando escolhida. */
+  valorTotal: number;
+  /** O cliente fechou nesta condição. No máximo uma por projeto. */
+  escolhida: boolean;
+}
+
 export interface MarcoCronograma {
   data: string;
   marco: string;
@@ -91,6 +150,17 @@ export interface MarcoCronograma {
 
 /** Blocos de texto editáveis da proposta comercial */
 export interface BlocosProposta {
+  /**
+   * Bloco "Projeto" — descrição do trabalho, escrita à mão.
+   *
+   * Vazio, a proposta cai na frase derivada de `linhaProjeto` ("Verão 2027 —
+   * Filme para Vivo."), que é o comportamento de sempre. Existe porque a frase
+   * derivada dá conta de um filme de campanha, mas não de um sprint: "o que
+   * vamos fazer" às vezes precisa de três parágrafos, e não havia onde
+   * escrevê-los sem empurrar o pitch para "Observações", depois do "Não está
+   * incluso".
+   */
+  projeto: string;
   servicoInclui: string;
   entrega: string;
   exclusoes: string;
@@ -303,5 +373,6 @@ export interface ProjetoArquivo {
   externos: CustoExterno[];
   internos: StaffInterno[];
   cronograma: MarcoCronograma[];
+  opcoes?: OpcaoComercial[];
   blocos: BlocosProposta;
 }

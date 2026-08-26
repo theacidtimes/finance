@@ -8,16 +8,18 @@ import {
   StyleSheet,
   pdf,
 } from "@react-pdf/renderer";
-import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
-import { formatBRL0 } from "@/utils/format";
-import { TEXTOS_MESTRE } from "@/data/catalogo";
+import type { Projeto, BlocosProposta, MarcoCronograma, OpcaoComercial } from "@/types";
+import { formatMoeda, idiomaDe, moedaDe, valorProposta } from "@/lib/moeda";
+import { textosMestre } from "@/data/textos-en";
 import {
   metaProposta,
-  linhaProjeto,
   blocosProposta,
   parseFicha,
+  textosProposta,
+  textoProjeto,
   type BlocoProposta,
 } from "@/lib/proposta";
+import { temOpcoes, linhaValida } from "@/lib/opcoes";
 
 const INK = "#111111";
 const MUTED = "#6B7280";
@@ -70,6 +72,24 @@ const s = StyleSheet.create({
   investLabel: { fontSize: 10 },
   investValue: { fontSize: 18, fontFamily: "Helvetica-Bold" },
   investNote: { fontSize: 8, color: MUTED, marginTop: 5 },
+  // Tabela de opções comerciais — mesma moldura da caixa de investimento,
+  // porque é o mesmo bloco da proposta, só que com mais de um preço.
+  tabela: { borderWidth: 1, borderColor: INK, borderRadius: 6 },
+  thead: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: INK,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  tr: { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 14 },
+  trSep: { borderBottomWidth: 1, borderBottomColor: LINE },
+  th: { fontSize: 8, letterSpacing: 1, fontFamily: "Helvetica-Bold", textTransform: "uppercase" },
+  td: { fontSize: 10 },
+  tdForte: { fontSize: 12, fontFamily: "Helvetica-Bold" },
+  col1: { width: "34%" },
+  col2: { width: "33%" },
+  col3: { width: "33%", textAlign: "right" },
   cronoRow: { flexDirection: "row", marginBottom: 3 },
   cronoData: { width: 60, fontFamily: "Helvetica-Bold", fontSize: 9 },
   cronoMarco: { flex: 1, fontSize: 9 },
@@ -137,28 +157,61 @@ function Ficha({ texto }: { texto: string }) {
   );
 }
 
+/** Bloco de investimento quando a proposta tem mais de um preço. */
+function Opcoes({
+  opcoes,
+  moeda,
+  idioma,
+}: {
+  opcoes: OpcaoComercial[];
+  moeda: ReturnType<typeof moedaDe>;
+  idioma: ReturnType<typeof idiomaDe>;
+}) {
+  const en = idioma === "en";
+  const linhas = opcoes.filter(linhaValida);
+  return (
+    <View style={s.tabela}>
+      <View style={s.thead}>
+        <Text style={[s.th, s.col1]}>{en ? "Booking" : "Condição"}</Text>
+        <Text style={[s.th, s.col2]}>{en ? "Day rate" : "Valor unitário"}</Text>
+        <Text style={[s.th, s.col3]}>{en ? "Total fee" : "Total"}</Text>
+      </View>
+      {linhas.map((o, i) => (
+        <View key={String(o.id)} style={i < linhas.length - 1 ? [s.tr, s.trSep] : s.tr}>
+          <Text style={[s.td, s.col1]}>{o.label}</Text>
+          <Text style={[s.td, s.col2]}>
+            {o.valorUnitario > 0
+              ? `${formatMoeda(o.valorUnitario, moeda, { idioma })}${en ? "/day" : "/un"}`
+              : ""}
+          </Text>
+          <Text style={[s.tdForte, s.col3]}>{formatMoeda(o.valorTotal, moeda, { idioma })}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export type PropostaData = {
   proj: Projeto;
   blocos: BlocosProposta;
   cronograma: MarcoCronograma[];
-  receitaBruta: number;
+  opcoes?: OpcaoComercial[];
   logoDataUrl?: string;
 };
 
-export function PropostaDoc({
-  proj,
-  blocos,
-  cronograma,
-  receitaBruta,
-  logoDataUrl,
-}: PropostaData) {
+export function PropostaDoc({ proj, blocos, cronograma, opcoes, logoDataUrl }: PropostaData) {
   // Quais blocos entram e com que número — mesma fonte que a tela usa.
   const B = blocosProposta(proj, blocos, cronograma);
+  // Idioma, moeda e frases fixas: as mesmas funções que a tela chama, para que
+  // o PDF não possa dizer nada diferente do que foi revisado antes de enviar.
+  const idioma = idiomaDe(proj);
+  const T = textosProposta(proj);
+  const M = textosMestre(idioma);
   // O flag `miudo` decide o corpo: termos em fonte menor que o resto.
   const corpo = (b: BlocoProposta) => (b.miudo ? s.bodyMiudo : s.body);
   return (
     <Document
-      title={`Proposta ${proj.cliente} ${proj.projeto}`.trim()}
+      title={`${idioma === "en" ? "Proposal" : "Proposta"} ${proj.cliente} ${proj.projeto}`.trim()}
       author="THE ACID TIMES LTDA"
       subject={proj.titulo}
     >
@@ -177,7 +230,7 @@ export function PropostaDoc({
           </View>
           {proj.roteiroUrl && proj.roteiroUrl.trim() ? (
             <Text style={s.roteiroRow}>
-              <Text style={s.metaLabel}>Roteiro de referência: </Text>
+              <Text style={s.metaLabel}>{T.roteiroLabel}: </Text>
               <Link src={proj.roteiroUrl} style={s.roteiroLink}>
                 {proj.roteiroLabel && proj.roteiroLabel.trim() ? proj.roteiroLabel : proj.roteiroUrl}
               </Link>
@@ -188,7 +241,7 @@ export function PropostaDoc({
         <Text style={s.titulo}>{proj.titulo}</Text>
 
         <Block b={B.projeto}>
-          <Text style={s.body}>{linhaProjeto(proj)}</Text>
+          <Text style={s.body}>{textoProjeto(proj, blocos)}</Text>
         </Block>
         <Block b={B.servicoInclui}>
           <Text style={s.body}>{blocos.servicoInclui}</Text>
@@ -198,11 +251,17 @@ export function PropostaDoc({
         </Block>
 
         <Block b={B.investimento} unido>
-          <View style={s.investBox}>
-            <Text style={s.investLabel}>Investimento total do projeto</Text>
-            <Text style={s.investValue}>{formatBRL0(receitaBruta)}</Text>
-          </View>
-          <Text style={s.investNote}>Valor bruto, impostos inclusos.</Text>
+          {temOpcoes(opcoes) ? (
+            <Opcoes opcoes={opcoes!} moeda={moedaDe(proj)} idioma={idioma} />
+          ) : (
+            <View style={s.investBox}>
+              <Text style={s.investLabel}>{T.investimentoLabel}</Text>
+              <Text style={s.investValue}>
+                {formatMoeda(valorProposta(proj), moedaDe(proj), { idioma })}
+              </Text>
+            </View>
+          )}
+          <Text style={s.investNote}>{T.investimentoNota}</Text>
         </Block>
 
         <Block b={B.pagamento}>
@@ -231,18 +290,16 @@ export function PropostaDoc({
           <Text style={s.body}>{blocos.observacoes}</Text>
         </Block>
         <Block b={B.cancelamento}>
-          <Text style={corpo(B.cancelamento)}>{TEXTOS_MESTRE.cancelamento}</Text>
+          <Text style={corpo(B.cancelamento)}>{M.cancelamento}</Text>
         </Block>
         <Block b={B.clausulaIA}>
-          <Text style={corpo(B.clausulaIA)}>{TEXTOS_MESTRE.clausulaIA}</Text>
+          <Text style={corpo(B.clausulaIA)}>{M.clausulaIA}</Text>
         </Block>
         <Block b={B.materiais}>
-          <Text style={corpo(B.materiais)}>{TEXTOS_MESTRE.materiais}</Text>
+          <Text style={corpo(B.materiais)}>{M.materiais}</Text>
         </Block>
         <Block b={B.validade}>
-          <Text style={corpo(B.validade)}>
-            Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
-          </Text>
+          <Text style={corpo(B.validade)}>{T.validade}</Text>
         </Block>
 
         <View style={s.footer} fixed>

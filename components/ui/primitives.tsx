@@ -124,6 +124,13 @@ export function TextInput({
   );
 }
 
+/**
+ * Opção do select. String simples quando o valor gravado é o que se lê
+ * ("Filme", "BRL"); par quando não é — idioma é gravado como "pt"/"en" e
+ * exibido como "Português"/"English".
+ */
+export type OpcaoSelect = string | { value: string; label: string };
+
 export function Select({
   value,
   onChange,
@@ -132,7 +139,7 @@ export function Select({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: readonly string[];
+  options: readonly OpcaoSelect[];
   className?: string;
 }) {
   return (
@@ -141,11 +148,14 @@ export function Select({
       onChange={(e) => onChange(e.target.value)}
       className={cn("border border-input rounded-md px-2 py-1.5 text-sm w-full bg-card", className)}
     >
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
+      {options.map((o) => {
+        const { value: v, label } = typeof o === "string" ? { value: o, label: o } : o;
+        return (
+          <option key={v} value={v}>
+            {label}
+          </option>
+        );
+      })}
     </select>
   );
 }
