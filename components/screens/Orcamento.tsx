@@ -8,19 +8,23 @@ import { ImportarPedido } from "@/components/screens/ImportarPedido";
 import { useProjetoStore, completoDoStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { criarVersao } from "@/lib/supabase/queries";
-import { useDRE } from "@/lib/useDRE";
+import type { BlocosProposta } from "@/types";
 import {
   metaProposta,
   linhaProjeto,
   blocosProposta,
   parseFicha,
   serializarFicha,
-  ROTULOS_FICHA,
+  rotulosFicha,
+  textosProposta,
+  textoProjeto,
   type BlocoProposta,
 } from "@/lib/proposta";
-import { formatBRL0 } from "@/utils/format";
-import { CATALOGO, TEXTOS_MESTRE, blocosParaProdutos, type ItemProposta } from "@/data/catalogo";
-import type { BlocosProposta } from "@/types";
+import { formatMoeda, idiomaDe, moedaDe, valorProposta } from "@/lib/moeda";
+import { temOpcoes, linhaValida, valorDaProposta } from "@/lib/opcoes";
+import type { OpcaoComercial, MoedaProposta, IdiomaProposta } from "@/types";
+import { CATALOGO, blocosParaProdutos, type ItemProposta } from "@/data/catalogo";
+import { textosMestre } from "@/data/textos-en";
 
 /**
  * Bloco da proposta.
@@ -196,7 +200,16 @@ function Ficha({ texto }: { texto: string }) {
  * pedido nem nos templates do catálogo — inclusive as linhas de cabeçalho
  * ("Filme IA (2x):") e as linhas em branco que separam produtos.
  */
-function FichaEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function FichaEditor({
+  value,
+  onChange,
+  rotulos,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** Sugestões do datalist — os campos da ficha no idioma da proposta. */
+  rotulos: string[];
+}) {
   const linhas = parseFicha(value);
   const commit = (next: typeof linhas) => onChange(serializarFicha(next));
 
@@ -212,7 +225,7 @@ function FichaEditor({ value, onChange }: { value: string; onChange: (v: string)
   return (
     <div className="space-y-1.5">
       <datalist id="rotulos-ficha">
-        {ROTULOS_FICHA.map((r) => (
+        {rotulos.map((r) => (
           <option key={r} value={r} />
         ))}
       </datalist>
@@ -262,6 +275,149 @@ function FichaEditor({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
+/**
+ * Tabela de opções comerciais — o que o cliente lê.
+ *
+ * Mesmo desenho da caixa de investimento (moldura preta, valor em negrito à
+ * direita), porque é o mesmo bloco: o preço da proposta. A diferença é que aqui
+ * ele tem mais de uma linha.
+ */
+function TabelaOpcoes({
+  opcoes,
+  moeda,
+  idioma,
+}: {
+  opcoes: OpcaoComercial[];
+  moeda: MoedaProposta;
+  idioma: IdiomaProposta;
+}) {
+  const en = idioma === "en";
+  return (
+    <div className="border border-foreground rounded-lg overflow-hidden">
+      <div className="flex px-4 py-2 border-b border-foreground text-[10px] tracking-widest uppercase font-semibold">
+        <span className="w-[34%]">{en ? "Booking" : "Condição"}</span>
+        <span className="w-[33%]">{en ? "Day rate" : "Valor unitário"}</span>
+        <span className="w-[33%] text-right">{en ? "Total fee" : "Total"}</span>
+      </div>
+      {opcoes.filter(linhaValida).map((o, i, arr) => (
+        <div
+          key={o.id}
+          className={`flex px-4 py-2 items-baseline text-sm ${
+            i < arr.length - 1 ? "border-b border-border" : ""
+          } ${o.escolhida ? "bg-acid/10" : ""}`}
+        >
+          <span className="w-[34%]">{o.label}</span>
+          <span className="w-[33%] tabular-nums">
+            {o.valorUnitario > 0 ? formatMoeda(o.valorUnitario, moeda, { idioma }) : ""}
+            {o.valorUnitario > 0 ? (en ? "/day" : "/un") : ""}
+          </span>
+          <span className="w-[33%] text-right font-semibold tabular-nums">
+            {formatMoeda(o.valorTotal, moeda, { idioma })}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Editor das opções. Marcar uma linha como fechada é o que define o valor do
+ * projeto — por isso o rádio fica aqui, junto do preço, e não no Cadastro.
+ */
+function OpcoesEditor({
+  opcoes,
+  moeda,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onEscolher,
+}: {
+  opcoes: OpcaoComercial[];
+  moeda: MoedaProposta;
+  onAdd: () => void;
+  onUpdate: (id: OpcaoComercial["id"], patch: Partial<OpcaoComercial>) => void;
+  onRemove: (id: OpcaoComercial["id"]) => void;
+  onEscolher: (id: OpcaoComercial["id"]) => void;
+}) {
+  const campo =
+    "border border-input rounded-md px-2 py-1 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-ring";
+  const num = `${campo} tabular-nums`;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-2 text-[10px] tracking-widest uppercase text-muted-foreground px-1">
+        <span className="w-8" />
+        <span className="flex-1">Condição</span>
+        <span className="w-20">Qtd.</span>
+        <span className="w-28">Unitário</span>
+        <span className="w-28">Total</span>
+        <span className="w-6" />
+      </div>
+
+      {opcoes.map((o) => (
+        <div key={o.id} className="flex gap-2 items-center">
+          <input
+            type="radio"
+            checked={o.escolhida}
+            onChange={() => onEscolher(o.id)}
+            onClick={() => o.escolhida && onEscolher(o.id)}
+            className="accent-acid w-4 h-4 shrink-0 ml-2 mr-2"
+            title="Cliente fechou nesta condição — é este valor que vai para o DRE"
+          />
+          <input
+            value={o.label}
+            onChange={(e) => onUpdate(o.id, { label: e.target.value })}
+            placeholder="2 days"
+            className={`${campo} flex-1`}
+          />
+          <input
+            type="number"
+            value={o.quantidade || ""}
+            onChange={(e) => onUpdate(o.id, { quantidade: Number(e.target.value) })}
+            placeholder="2"
+            className={`${num} w-20`}
+          />
+          <input
+            type="number"
+            value={o.valorUnitario || ""}
+            onChange={(e) => onUpdate(o.id, { valorUnitario: Number(e.target.value) })}
+            placeholder="1500"
+            className={`${num} w-28`}
+          />
+          <input
+            type="number"
+            value={o.valorTotal || ""}
+            onChange={(e) => onUpdate(o.id, { valorTotal: Number(e.target.value) })}
+            placeholder="3000"
+            className={`${num} w-28`}
+            title="Preenchido por quantidade × unitário; pode ser escrito à mão"
+          />
+          <button
+            onClick={() => onRemove(o.id)}
+            className="text-muted-foreground hover:text-danger px-1"
+            aria-label="Remover condição"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3 pt-1">
+        <button
+          onClick={onAdd}
+          className="text-xs px-2 py-1 rounded border border-input hover:bg-muted"
+        >
+          + condição
+        </button>
+        <span className="text-[11px] text-muted-foreground">
+          Moeda: {moeda}. O rádio marca a condição fechada — enquanto nenhuma estiver marcada, o
+          projeto vale a <b>menor</b> delas no DRE e na carteira.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // Definido fora do componente de tela: se ficasse dentro do corpo de `Orcamento`,
 // seria recriado a cada render, desmontando o <textarea> e fazendo perder foco/rolagem.
 function Area({
@@ -293,10 +449,14 @@ export function Orcamento() {
   const cronograma = useProjetoStore((s) => s.cronograma);
   const setP = useProjetoStore((s) => s.setProjField);
   const setBloco = useProjetoStore((s) => s.setBloco);
+  const opcoes = useProjetoStore((s) => s.opcoes);
+  const addOpcao = useProjetoStore((s) => s.addOpcao);
+  const updateOpcao = useProjetoStore((s) => s.updateOpcao);
+  const removeOpcao = useProjetoStore((s) => s.removeOpcao);
+  const escolherOpcao = useProjetoStore((s) => s.escolherOpcao);
   const addMarco = useProjetoStore((s) => s.addMarco);
   const updateMarco = useProjetoStore((s) => s.updateMarco);
   const removeMarco = useProjetoStore((s) => s.removeMarco);
-  const dre = useDRE();
   const { can } = usePerfil();
   const podeGerar = can("gerar_orcamento");
 
@@ -313,7 +473,7 @@ export function Orcamento() {
         proj,
         blocos,
         cronograma,
-        receitaBruta: dre.receitaBruta,
+        opcoes,
         logoDataUrl,
       });
       downloadBlob(blob, `Proposta_${fileBase(proj)}.pdf`);
@@ -330,6 +490,11 @@ export function Orcamento() {
 
   // Quais blocos entram na proposta e com que número — mesma fonte do PDF.
   const B = blocosProposta(proj, blocos, cronograma);
+  const idioma = idiomaDe(proj);
+  const moeda = moedaDe(proj);
+  const T = textosProposta(proj);
+  const M = textosMestre(idioma);
+  const comOpcoes = temOpcoes(opcoes);
   const vazios = Object.values(B).filter((b) => !b.incluso).length;
 
   const area = (k: keyof BlocosProposta, rows = 4) => (
@@ -423,7 +588,7 @@ export function Orcamento() {
             </div>
           ) : proj.roteiroUrl && proj.roteiroUrl.trim() ? (
             <div className="text-xs text-muted-foreground mt-3">
-              <b>Roteiro de referência:</b>{" "}
+              <b>{T.roteiroLabel}:</b>{" "}
               <a
                 href={proj.roteiroUrl}
                 target="_blank"
@@ -450,23 +615,86 @@ export function Orcamento() {
         </div>
 
         <Bloco b={B.projeto} editando={editando}>
-          {linhaProjeto(proj)}
+          {editando ? (
+            <>
+              <textarea
+                value={blocos.projeto}
+                onChange={(e) => setBloco("projeto", e.target.value)}
+                rows={5}
+                placeholder={linhaProjeto(proj)}
+                className="w-full border border-input rounded-md p-2 text-sm leading-relaxed bg-card focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {!blocos.projeto.trim() && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Vazio, sai a frase automática: <b>{linhaProjeto(proj)}</b>
+                </p>
+              )}
+            </>
+          ) : (
+            textoProjeto(proj, blocos)
+          )}
         </Bloco>
         <Bloco b={B.servicoInclui} editando={editando}>{area("servicoInclui", 16)}</Bloco>
         <Bloco b={B.entrega} editando={editando}>
           {editando ? (
-            <FichaEditor value={blocos.entrega} onChange={(v) => setBloco("entrega", v)} />
+            <FichaEditor
+              value={blocos.entrega}
+              onChange={(v) => setBloco("entrega", v)}
+              rotulos={rotulosFicha(idioma)}
+            />
           ) : (
             <Ficha texto={blocos.entrega} />
           )}
         </Bloco>
 
         <Bloco b={B.investimento} editando={editando}>
-          <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">
-            <span className="text-sm">Investimento total do projeto</span>
-            <span className="text-2xl font-bold tabular-nums">{formatBRL0(dre.receitaBruta)}</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">Valor bruto, impostos inclusos.</p>
+          {editando ? (
+            <div className="space-y-3">
+              {comOpcoes || opcoes.length ? (
+                <OpcoesEditor
+                  opcoes={opcoes}
+                  moeda={moeda}
+                  onAdd={addOpcao}
+                  onUpdate={updateOpcao}
+                  onRemove={removeOpcao}
+                  onEscolher={escolherOpcao}
+                />
+              ) : (
+                <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">
+                  <span className="text-sm">{T.investimentoLabel}</span>
+                  <span className="text-2xl font-bold tabular-nums">
+                    {formatMoeda(valorProposta(proj), moeda, { idioma })}
+                  </span>
+                </div>
+              )}
+              {!opcoes.length && (
+                <button
+                  onClick={addOpcao}
+                  className="text-xs px-2 py-1 rounded border border-input hover:bg-muted"
+                  title="Proposta com mais de um preço — sprint por diárias, pacotes"
+                >
+                  + condições comerciais
+                </button>
+              )}
+            </div>
+          ) : comOpcoes ? (
+            <TabelaOpcoes opcoes={opcoes} moeda={moeda} idioma={idioma} />
+          ) : (
+            <div className="border border-foreground rounded-lg px-5 py-4 flex items-baseline justify-between">
+              <span className="text-sm">{T.investimentoLabel}</span>
+              <span className="text-2xl font-bold tabular-nums">
+                {formatMoeda(valorProposta(proj), moeda, { idioma })}
+              </span>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">{T.investimentoNota}</p>
+          {comOpcoes && editando && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              No DRE e na carteira este projeto vale{" "}
+              <b>{formatMoeda(valorDaProposta(opcoes, valorProposta(proj)), moeda, { idioma })}</b>
+              {opcoes.some((o) => o.escolhida) ? " (condição fechada)." : " — a menor condição."}
+            </p>
+          )}
         </Bloco>
 
         <Bloco b={B.pagamento} editando={editando}>
@@ -507,12 +735,27 @@ export function Orcamento() {
         <Bloco b={B.exclusoes} editando={editando}>{area("exclusoes", 4)}</Bloco>
         <Bloco b={B.alteracoes} editando={editando}>{area("alteracoes", 5)}</Bloco>
         <Bloco b={B.observacoes} editando={editando}>{area("observacoes", 2)}</Bloco>
-        <Bloco b={B.cancelamento} editando={editando} fixo>{TEXTOS_MESTRE.cancelamento}</Bloco>
-        <Bloco b={B.clausulaIA} editando={editando} fixo>{TEXTOS_MESTRE.clausulaIA}</Bloco>
-        <Bloco b={B.materiais} editando={editando} fixo>{TEXTOS_MESTRE.materiais}</Bloco>
-        <Bloco b={B.validade} editando={editando}>
-          Esta proposta é válida por {proj.validadeProposta} a partir da data de emissão.
-        </Bloco>
+        <Bloco b={B.cancelamento} editando={editando} fixo>{M.cancelamento}</Bloco>
+        {(!proj.semClausulaIA || editando) && (
+          <div className={proj.semClausulaIA ? "opacity-50" : ""}>
+            <Bloco b={B.clausulaIA} editando={editando} fixo>
+              {M.clausulaIA}
+            </Bloco>
+            {editando && (
+              <label className="flex items-center gap-2 text-[11px] text-muted-foreground -mt-4 mb-6">
+                <input
+                  type="checkbox"
+                  checked={Boolean(proj.semClausulaIA)}
+                  onChange={(e) => setP("semClausulaIA", e.target.checked)}
+                  className="accent-acid w-3.5 h-3.5"
+                />
+                Não incluir esta cláusula nesta proposta
+              </label>
+            )}
+          </div>
+        )}
+        <Bloco b={B.materiais} editando={editando} fixo>{M.materiais}</Bloco>
+        <Bloco b={B.validade} editando={editando}>{T.validade}</Bloco>
 
         {vazios > 0 && editando && (
           <p className="text-[11px] text-muted-foreground border-t border-border pt-3 mt-2">

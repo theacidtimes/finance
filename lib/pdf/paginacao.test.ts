@@ -99,7 +99,6 @@ async function sobraMaxima(n: number) {
       observacoes: "Sem observações.",
     },
     cronograma: [{ data: "10/08", marco: "Kickoff" }],
-    receitaBruta: 235000,
   }) as React.ReactElement<DocumentProps>;
   const buf = await renderToBuffer(doc);
   const fundos = fundoDasPaginas(buf);

@@ -7,6 +7,8 @@ import {
   parseFicha,
   serializarFicha,
   fichaVisivel,
+  textosProposta,
+  rotulosFicha,
   type ChaveBloco,
 } from "./proposta";
 import { novoProjetoDefaults, BLOCOS_PADRAO } from "@/data/blocos";
@@ -137,6 +139,7 @@ describe("blocos da proposta: vazio não ocupa página", () => {
 
   it("blocos derivados e fixos nunca somem, mesmo com a proposta toda vazia", () => {
     const vazios: BlocosProposta = {
+      projeto: "",
       servicoInclui: "",
       entrega: "",
       exclusoes: "",
@@ -343,6 +346,91 @@ describe("frase de abertura do bloco Projeto", () => {
   it("nunca sai com dois pontos finais", () => {
     expect(linhaProjeto(proj({ projeto: "Verão 2027.", tipo: "Outro", marca: "Verão 2027" }))).toBe(
       "Verão 2027."
+    );
+  });
+});
+
+describe("proposta em inglês", () => {
+  const en = (over: Partial<Projeto> = {}) => proj({ idiomaProposta: "en", ...over });
+
+  it("projeto sem idioma definido continua em português", () => {
+    // Todo projeto gravado antes deste campo cai aqui: nada muda para eles.
+    const B = blocosProposta(proj(), BLOCOS_PADRAO, []);
+    expect(B.investimento.titulo).toBe("Investimento");
+    expect(rotulos(proj())).toContain("Cliente");
+  });
+
+  it("traduz os rótulos do cabeçalho", () => {
+    expect(rotulos(en({ marca: "Vivo", contato: "Ana" }))).toEqual([
+      "Date",
+      "Client",
+      "Brand",
+      "Contact",
+      "Project",
+      "Valid for",
+    ]);
+  });
+
+  it("traduz os títulos dos blocos sem mexer na numeração", () => {
+    const B = blocosProposta(en({ condicaoPagamento: "50% upfront" }), BLOCOS_PADRAO, []);
+    expect(B.projeto.titulo).toBe("Project");
+    expect(B.investimento.titulo).toBe("Investment");
+    expect(B.exclusoes.titulo).toBe("Not included");
+    expect(B.clausulaIA.titulo).toBe("AI imagery and technical limitations");
+    // Mesma regra de omissão dos dois idiomas: cronograma vazio fica de fora.
+    expect(B.cronograma.incluso).toBe(false);
+    expect(B.cronograma.n).toBe("");
+  });
+
+  it("a frase de abertura sai em inglês, com o tipo traduzido", () => {
+    expect(linhaProjeto(en({ projeto: "Summer 2027", marca: "Vivo", tipo: "Filme" }))).toBe(
+      "Summer 2027 — Film for Vivo."
+    );
+    // "Outro" não é tipo de peça em nenhum idioma.
+    expect(linhaProjeto(en({ projeto: "Summer 2027", marca: "Vivo", tipo: "Outro" }))).toBe(
+      "Summer 2027 for Vivo."
+    );
+  });
+
+  it("frases fixas do documento acompanham o idioma", () => {
+    const T = textosProposta(en({ validadeProposta: "15 days" }));
+    expect(T.investimentoLabel).toBe("Total project investment");
+    expect(T.validade).toBe("This proposal is valid for 15 days from the date of issue.");
+    expect(T.roteiroLabel).toBe("Reference script");
+  });
+
+  it("em moeda estrangeira, a nota do investimento nomeia a moeda", () => {
+    // A cifra sozinha é ambígua fora do Brasil — o código ISO fecha a dúvida.
+    const T = textosProposta(en({ moeda: "EUR" }));
+    expect(T.investimentoNota).toBe("Gross amount, taxes included. All amounts in euros (EUR).");
+  });
+
+  it("em real, a nota do investimento não fala de moeda", () => {
+    expect(textosProposta(proj()).investimentoNota).toBe("Valor bruto, impostos inclusos.");
+  });
+
+  it("os campos da ficha acompanham o idioma, na mesma ordem", () => {
+    expect(rotulosFicha("en")[0]).toBe("Deliverable");
+    expect(rotulosFicha("pt")[0]).toBe("Entregável");
+    expect(rotulosFicha("en")).toHaveLength(rotulosFicha("pt").length);
+  });
+});
+
+describe("nº de serviço no cabeçalho", () => {
+  it("entra entre parênteses quando existe", () => {
+    expect(valor(proj({ projeto: "Nike Football", numeroServico: "042" }), "Projeto")).toBe(
+      "Nike Football (042)"
+    );
+  });
+
+  it("sem número, o parêntese vazio não vai para o cliente", () => {
+    // "Nike Football ()" no cabeçalho passa a mesma impressão de descuido que
+    // um "Contato:" em branco — e a regra dos outros campos já é essa.
+    expect(valor(proj({ projeto: "Nike Football", numeroServico: "" }), "Projeto")).toBe(
+      "Nike Football"
+    );
+    expect(valor(proj({ projeto: "Nike Football", numeroServico: "   " }), "Projeto")).toBe(
+      "Nike Football"
     );
   });
 });

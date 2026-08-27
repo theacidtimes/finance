@@ -1,4 +1,11 @@
-import type { Projeto, BlocosProposta, MarcoCronograma } from "@/types";
+import type {
+  Projeto,
+  BlocosProposta,
+  MarcoCronograma,
+  IdiomaProposta,
+  TipoProjeto,
+} from "@/types";
+import { idiomaDe, moedaDe, nomeMoeda, propostaInternacional } from "@/lib/moeda";
 
 /**
  * Cabeçalho da proposta comercial — fonte única para a tela e para o PDF.
@@ -19,23 +26,56 @@ export interface MetaProposta {
   valor: string;
 }
 
+/**
+ * Rótulos do cabeçalho, por idioma.
+ *
+ * O idioma é do DOCUMENTO, não do sistema: a tela de cadastro, o DRE e o
+ * dashboard continuam em português para quem trabalha aqui. Só a proposta —
+ * o que sai para o cliente — troca de língua.
+ */
+const META_ROTULOS: Record<IdiomaProposta, Record<string, string>> = {
+  pt: {
+    data: "Data",
+    cliente: "Cliente",
+    marca: "Marca",
+    contato: "Contato",
+    projeto: "Projeto",
+    validade: "Validade",
+  },
+  en: {
+    data: "Date",
+    cliente: "Client",
+    marca: "Brand",
+    contato: "Contact",
+    projeto: "Project",
+    validade: "Valid for",
+  },
+};
+
 export function metaProposta(proj: Projeto): MetaProposta[] {
+  const R = META_ROTULOS[idiomaDe(proj)];
   const itens: MetaProposta[] = [
-    { rotulo: "Data", valor: proj.data },
-    { rotulo: "Cliente", valor: proj.cliente },
+    { rotulo: R.data, valor: proj.data },
+    { rotulo: R.cliente, valor: proj.cliente },
   ];
 
   const marca = proj.marca?.trim();
   if (marca && marca.toLowerCase() !== proj.cliente.trim().toLowerCase()) {
-    itens.push({ rotulo: "Marca", valor: marca });
+    itens.push({ rotulo: R.marca, valor: marca });
   }
 
   const contato = proj.contato?.trim();
-  if (contato) itens.push({ rotulo: "Contato", valor: contato });
+  if (contato) itens.push({ rotulo: R.contato, valor: contato });
 
+  // Sem nº de serviço, o parêntese fica vazio ("Nike Football ()") — mesma
+  // regra de Marca e Contato: rótulo sem conteúdo não entra no cabeçalho.
+  const numero = proj.numeroServico?.trim();
   itens.push(
-    { rotulo: "Projeto", valor: `${proj.projeto} (${proj.numeroServico})` },
-    { rotulo: "Validade", valor: proj.validadeProposta }
+    {
+      rotulo: R.projeto,
+      valor: numero ? `${proj.projeto} (${numero})` : proj.projeto,
+    },
+    { rotulo: R.validade, valor: proj.validadeProposta }
   );
 
   return itens;
@@ -78,12 +118,34 @@ function contemNome(texto: string, nome: string): boolean {
  *
  * Então cada parte só entra quando acrescenta informação.
  */
+/**
+ * Tipo de peça em inglês. "Outro" não entra em nenhum idioma — é a opção de
+ * escape do cadastro, não um tipo que se escreva para o cliente ler.
+ */
+const TIPO_EN: Record<TipoProjeto, string> = {
+  Filme: "Film",
+  KV: "Key visual",
+  Social: "Social",
+  Campanha: "Campaign",
+  Outro: "",
+};
+
 export function linhaProjeto(proj: Projeto): string {
+  const idioma = idiomaDe(proj);
   const nome = (proj.projeto || "").trim().replace(/[.\s]+$/, "");
-  const tipo = proj.tipo && proj.tipo !== "Outro" ? proj.tipo : "";
+  const bruto = proj.tipo && proj.tipo !== "Outro" ? proj.tipo : "";
+  const tipo = bruto ? (idioma === "en" ? TIPO_EN[bruto] : bruto) : "";
   const para = destinatario(proj).trim();
   // Repetir o nome que já está no título do projeto não informa nada.
   const alvo = para && !contemNome(nome, para) ? para : "";
+
+  if (idioma === "en") {
+    if (!nome) return alvo ? `Project for ${alvo}.` : "Project.";
+    if (tipo && alvo) return `${nome} — ${tipo} for ${alvo}.`;
+    if (tipo) return `${nome} — ${tipo}.`;
+    if (alvo) return `${nome} for ${alvo}.`;
+    return `${nome}.`;
+  }
 
   if (!nome) return alvo ? `Projeto para ${alvo}.` : "Projeto.";
   if (tipo && alvo) return `${nome} — ${tipo} para ${alvo}.`;
@@ -166,6 +228,25 @@ export const ROTULOS_FICHA = [
   "Deliveries de áudio",
 ];
 
+/** Os mesmos campos, na proposta em inglês. Mesma ordem — é a mesma ficha. */
+export const ROTULOS_FICHA_EN = [
+  "Deliverable",
+  "Duration",
+  "Format",
+  "Territory",
+  "Usage term",
+  "Media",
+  "Music",
+  "Voice-over",
+  "Accessibility",
+  "Image deliverables",
+  "Audio deliverables",
+];
+
+export function rotulosFicha(idioma: IdiomaProposta): string[] {
+  return idioma === "en" ? ROTULOS_FICHA_EN : ROTULOS_FICHA;
+}
+
 /* ============================================================
  * Blocos da proposta — quais entram e com que número
  * ========================================================== */
@@ -203,25 +284,40 @@ export interface BlocoProposta {
  *             argumento de venda: entram em corpo menor para não competir com
  *             escopo e investimento, que é o que o cliente precisa ler.
  */
-const ORDEM: { chave: ChaveBloco; titulo: string; sempre?: true; miudo?: true }[] = [
-  { chave: "projeto", titulo: "Projeto", sempre: true },
-  { chave: "servicoInclui", titulo: "O serviço inclui" },
-  { chave: "entrega", titulo: "Especificação da entrega" },
-  { chave: "investimento", titulo: "Investimento", sempre: true },
-  { chave: "pagamento", titulo: "Condições de pagamento" },
-  { chave: "cronograma", titulo: "Cronograma" },
-  { chave: "exclusoes", titulo: "Não está incluso" },
-  { chave: "alteracoes", titulo: "Alterações e refações" },
-  { chave: "observacoes", titulo: "Observações" },
-  { chave: "cancelamento", titulo: "Cancelamento", sempre: true, miudo: true },
+type Titulo = Record<IdiomaProposta, string>;
+
+const ORDEM: { chave: ChaveBloco; titulo: Titulo; sempre?: true; miudo?: true }[] = [
+  { chave: "projeto", titulo: { pt: "Projeto", en: "Project" }, sempre: true },
+  { chave: "servicoInclui", titulo: { pt: "O serviço inclui", en: "The service includes" } },
+  { chave: "entrega", titulo: { pt: "Especificação da entrega", en: "Deliverables" } },
+  { chave: "investimento", titulo: { pt: "Investimento", en: "Investment" }, sempre: true },
+  { chave: "pagamento", titulo: { pt: "Condições de pagamento", en: "Payment terms" } },
+  { chave: "cronograma", titulo: { pt: "Cronograma", en: "Schedule" } },
+  { chave: "exclusoes", titulo: { pt: "Não está incluso", en: "Not included" } },
+  { chave: "alteracoes", titulo: { pt: "Alterações e refações", en: "Revisions and rework" } },
+  { chave: "observacoes", titulo: { pt: "Observações", en: "Notes" } },
   {
-    chave: "clausulaIA",
-    titulo: "Imagens e limitações técnicas em IA",
+    chave: "cancelamento",
+    titulo: { pt: "Cancelamento", en: "Cancellation" },
     sempre: true,
     miudo: true,
   },
-  { chave: "materiais", titulo: "Materiais de apoio", sempre: true, miudo: true },
-  { chave: "validade", titulo: "Validade", sempre: true, miudo: true },
+  {
+    chave: "clausulaIA",
+    titulo: {
+      pt: "Imagens e limitações técnicas em IA",
+      en: "AI imagery and technical limitations",
+    },
+    sempre: true,
+    miudo: true,
+  },
+  {
+    chave: "materiais",
+    titulo: { pt: "Materiais de apoio", en: "Supporting materials" },
+    sempre: true,
+    miudo: true,
+  },
+  { chave: "validade", titulo: { pt: "Validade", en: "Validity" }, sempre: true, miudo: true },
 ];
 
 const cheio = (v?: string) => Boolean(v && v.trim());
@@ -260,23 +356,95 @@ export function blocosProposta(
     alteracoes: cheio(blocos.alteracoes),
     observacoes: cheio(blocos.observacoes),
     cancelamento: true,
-    clausulaIA: true,
+    // Único bloco fixo que sai do documento por decisão do projeto. Ver
+    // `Projeto.semClausulaIA`: só faz sentido quando não há imagem gerada.
+    clausulaIA: !proj.semClausulaIA,
     materiais: true,
     validade: true,
   };
 
+  const idioma = idiomaDe(proj);
   const out = {} as Record<ChaveBloco, BlocoProposta>;
   let n = 0;
   for (const item of ORDEM) {
-    const incluso = item.sempre ? true : temConteudo[item.chave];
+    // `sempre` em ORDEM documenta a intenção; a decisão sai de `temConteudo`,
+    // onde esses blocos são `true` fixo — com uma exceção, a cláusula de IA,
+    // que o projeto pode desligar.
+    const incluso = temConteudo[item.chave];
     if (incluso) n += 1;
     out[item.chave] = {
       chave: item.chave,
-      titulo: item.titulo,
+      titulo: item.titulo[idioma],
       incluso,
       n: incluso ? String(n) : "",
       miudo: Boolean(item.miudo),
     };
   }
   return out;
+}
+
+/**
+ * O corpo do bloco "Projeto".
+ *
+ * Texto livre quando existe; a frase derivada quando não. Fonte única para a
+ * tela e o PDF — sem isto, um dos dois imprimiria a descrição escrita à mão e o
+ * outro "Nike Football — Film.".
+ */
+export function textoProjeto(proj: Projeto, blocos: BlocosProposta): string {
+  const escrito = blocos.projeto?.trim();
+  return escrito || linhaProjeto(proj);
+}
+
+/* ============================================================
+ * Frases fixas do documento
+ * ========================================================== */
+
+/**
+ * O que a tela e o PDF escrevem por conta própria — rótulo do investimento,
+ * nota de moeda, frase de validade, rótulo do link do roteiro.
+ *
+ * Estavam como literais duplicados nos dois renderizadores. Enquanto era só
+ * português dava para conviver; com dois idiomas, uma frase traduzida em um
+ * lado e esquecida no outro produziria um PDF diferente do que foi revisado na
+ * tela — exatamente o que `blocosProposta` existe para impedir.
+ */
+export interface TextosProposta {
+  investimentoLabel: string;
+  investimentoNota: string;
+  validade: string;
+  roteiroLabel: string;
+}
+
+export function textosProposta(proj: Projeto): TextosProposta {
+  const idioma = idiomaDe(proj);
+  const moeda = moedaDe(proj);
+  // Em moeda estrangeira a cifra sozinha é ambígua (US$ e $ australiano usam o
+  // mesmo símbolo em muitos teclados). O nome por extenso + o código ISO tiram
+  // a dúvida no único número que o cliente vai levar para a aprovação interna.
+  const nota =
+    idioma === "en"
+      ? `Gross amount, taxes included.${
+          propostaInternacional(proj)
+            ? ` All amounts in ${nomeMoeda(moeda, "en")} (${moeda}).`
+            : ""
+        }`
+      : `Valor bruto, impostos inclusos.${
+          propostaInternacional(proj) ? ` Valores em ${nomeMoeda(moeda, "pt")} (${moeda}).` : ""
+        }`;
+
+  if (idioma === "en") {
+    return {
+      investimentoLabel: "Total project investment",
+      investimentoNota: nota,
+      validade: `This proposal is valid for ${proj.validadeProposta} from the date of issue.`,
+      roteiroLabel: "Reference script",
+    };
+  }
+
+  return {
+    investimentoLabel: "Investimento total do projeto",
+    investimentoNota: nota,
+    validade: `Esta proposta é válida por ${proj.validadeProposta} a partir da data de emissão.`,
+    roteiroLabel: "Roteiro de referência",
+  };
 }

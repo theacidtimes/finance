@@ -272,6 +272,8 @@ export type Database = {
       projects: {
         Row: {
           blocos: Json
+          cambio: number
+          cambio_data: string
           cliente: string
           client_id: string | null
           contato: string | null
@@ -279,9 +281,12 @@ export type Database = {
           condicao_pagamento: string | null
           created_at: string
           created_by: string | null
+          custo_cambio_pct: number
           data: string | null
           id: string
+          idioma_proposta: string
           impostos_pct: number
+          moeda: string
           marca: string | null
           numero_servico: string
           observacoes: string | null
@@ -291,15 +296,19 @@ export type Database = {
           responsavel: string | null
           roteiro_url: string | null
           roteiro_label: string | null
+          sem_clausula_ia: boolean
           status: string | null
           tipo: string
           titulo: string | null
           updated_at: string
           validade_proposta: string | null
           valor_bruto: number
+          valor_moeda: number
         }
         Insert: {
           blocos?: Json
+          cambio?: number
+          cambio_data?: string
           cliente: string
           client_id?: string | null
           contato?: string | null
@@ -307,9 +316,12 @@ export type Database = {
           condicao_pagamento?: string | null
           created_at?: string
           created_by?: string | null
+          custo_cambio_pct?: number
           data?: string | null
           id?: string
+          idioma_proposta?: string
           impostos_pct?: number
+          moeda?: string
           marca?: string | null
           numero_servico: string
           observacoes?: string | null
@@ -319,14 +331,40 @@ export type Database = {
           responsavel?: string | null
           roteiro_url?: string | null
           roteiro_label?: string | null
+          sem_clausula_ia?: boolean
           status?: string | null
           tipo?: string
           titulo?: string | null
           updated_at?: string
           validade_proposta?: string | null
           valor_bruto?: number
+          valor_moeda?: number
         }
         Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>
+        Relationships: []
+      }
+      proposal_options: {
+        Row: {
+          escolhida: boolean
+          id: string
+          label: string
+          ordem: number
+          project_id: string
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          escolhida?: boolean
+          id?: string
+          label?: string
+          ordem?: number
+          project_id: string
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: Partial<Database["public"]["Tables"]["proposal_options"]["Insert"]>
         Relationships: []
       }
       project_versions: {

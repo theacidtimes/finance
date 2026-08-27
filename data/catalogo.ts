@@ -374,6 +374,7 @@ export interface ItemProposta {
 }
 
 const BLOCOS_VAZIOS: BlocosProposta = {
+  projeto: "",
   servicoInclui: "",
   entrega: "",
   exclusoes: "",
@@ -431,6 +432,9 @@ export function blocosParaProdutos(itens: ItemProposta[], rounds = 1): BlocosPro
   // Blocos fixos (cancelamento, cláusula IA, materiais) NÃO são gerados aqui —
   // a proposta os renderiza direto do TEXTOS_MESTRE, sempre.
   return {
+    // O catálogo não escreve a descrição do projeto — ela é do projeto, não do
+    // produto. Vazio deixa a proposta cair na frase derivada de sempre.
+    projeto: "",
     servicoInclui,
     entrega,
     exclusoes,

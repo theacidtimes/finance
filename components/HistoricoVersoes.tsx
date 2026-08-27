@@ -184,7 +184,7 @@ export function HistoricoVersoes({
         proj: snapshot.proj,
         blocos: snapshot.blocos,
         cronograma: snapshot.cronograma,
-        receitaBruta: snapshot.proj.valorBruto,
+        opcoes: snapshot.opcoes,
         logoDataUrl: await loadLogoDataUrl(),
       });
       downloadBlob(blob, `Proposta_${fileBase(snapshot.proj)}_V${v.versao}.pdf`);

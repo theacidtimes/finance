@@ -29,7 +29,7 @@ const TABS: [TabId, string][] = [
 type SaveStatus = "saved" | "saving" | "error";
 
 const sigOf = (c: Omit<ProjetoCompleto, "id">) =>
-  JSON.stringify([c.proj, c.externos, c.internos, c.cronograma, c.blocos]);
+  JSON.stringify([c.proj, c.externos, c.internos, c.cronograma, c.opcoes, c.blocos]);
 
 export function ProjetoWorkspace({
   initial,
@@ -46,6 +46,7 @@ export function ProjetoWorkspace({
   const externos = useProjetoStore((s) => s.externos);
   const internos = useProjetoStore((s) => s.internos);
   const cronograma = useProjetoStore((s) => s.cronograma);
+  const opcoes = useProjetoStore((s) => s.opcoes);
   const blocos = useProjetoStore((s) => s.blocos);
   const hydrate = useProjetoStore((s) => s.hydrate);
 
@@ -62,6 +63,7 @@ export function ProjetoWorkspace({
       externos: initial.externos,
       internos: initial.internos,
       cronograma: initial.cronograma,
+      opcoes: initial.opcoes,
       blocos: initial.blocos,
     });
     lastSig.current = sigOf(initial);
@@ -70,7 +72,7 @@ export function ProjetoWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial.id]);
 
-  const sig = sigOf({ proj, externos, internos, cronograma, blocos });
+  const sig = sigOf({ proj, externos, internos, cronograma, opcoes, blocos });
 
   useEffect(() => {
     if (!readyRef.current) return;
