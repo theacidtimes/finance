@@ -9,8 +9,14 @@ import { createFriend, deleteFriend } from "@/lib/supabase/queries";
 import { novoFriendDefaults, alertasDoFriend } from "@/lib/friends";
 import { formatBRL0, formatDate } from "@/utils/format";
 import { AppShell } from "@/components/AppShell";
+import { ConvitesFriends } from "@/components/ConvitesFriends";
 import { usePerfil } from "@/components/PerfilProvider";
-import { CATEGORIAS_EXTERNAS, type CategoriaExterna, type FriendResumo } from "@/types";
+import {
+  CATEGORIAS_EXTERNAS,
+  type CategoriaExterna,
+  type ConviteFriend,
+  type FriendResumo,
+} from "@/types";
 
 const tipoTone: Record<string, string> = {
   Empresa: "bg-blue-50 text-blue-700 border-blue-200",
@@ -22,9 +28,11 @@ const tipoTone: Record<string, string> = {
 
 export function FriendsBentos({
   friends,
+  convites,
   userEmail,
 }: {
   friends: FriendResumo[];
+  convites: ConviteFriend[];
   userEmail: string;
 }) {
   const router = useRouter();
@@ -106,6 +114,8 @@ export function FriendsBentos({
             {criando ? "Criando…" : "Novo friend"}
           </button>
         </div>
+
+        <ConvitesFriends convites={convites} />
 
         <div className="flex flex-wrap gap-3 items-center">
           <input

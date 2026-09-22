@@ -12,7 +12,7 @@ export type StatusCustoExterno = "Orçado" | "Aprovado" | "Pago";
 export type CategoriaExterna =
   | "3D" | "AI Designer" | "ComfyUI" | "Motion" | "Motion AI" | "GP"
   | "Pós-produção" | "Finalização" | "Cor" | "Trilha" | "Locução" | "Áudio"
-  | "Retoque" | "Ilustração" | "Direção de Arte" | "Edição"
+  | "Retoque" | "Ilustração" | "Direção de Arte" | "Edição" | "Fotografia"
   | "Produção" | "Coordenação" | "Atendimento"
   | "Programação" | "UX Design"
   | "Reserva Técnica" | "Outros";
@@ -21,7 +21,7 @@ export type CategoriaExterna =
 export const CATEGORIAS_EXTERNAS: CategoriaExterna[] = [
   "3D", "AI Designer", "ComfyUI", "Motion", "Motion AI", "GP",
   "Pós-produção", "Finalização", "Cor", "Trilha", "Locução", "Áudio",
-  "Retoque", "Ilustração", "Direção de Arte", "Edição",
+  "Retoque", "Ilustração", "Direção de Arte", "Edição", "Fotografia",
   "Produção", "Coordenação", "Atendimento",
   "Programação", "UX Design",
   "Reserva Técnica", "Outros",
@@ -105,6 +105,12 @@ export interface CustoExterno {
   obs: string;
   /** Vínculo com o cadastro Acid Friends; null = fornecedor avulso. */
   friendId?: string | null;
+  /**
+   * Pedido de orçamento que originou esta linha. É a linha que aponta para o
+   * pedido, e não o contrário: o autosave apaga e regrava os custos externos,
+   * então o id da linha muda a cada gravação — o do pedido, não.
+   */
+  pedidoId?: string | null;
 }
 
 export interface StaffInterno {
@@ -296,6 +302,81 @@ export interface FriendResumo extends Friend {
   nProjetos: number;
   totalFaturado: number;
   ultimoProjeto: string; // ISO ou ""
+}
+
+/* ================= PEDIDO DE ORÇAMENTO A FORNECEDOR ================= */
+
+/**
+ * Ciclo do pedido. `Aprovado` é o único que mexe no projeto: é quando o valor
+ * cotado vira linha de custo externo (ver `lib/pedido-fornecedor.ts`).
+ */
+export type StatusPedido = "Rascunho" | "Enviado" | "Recebido" | "Aprovado" | "Recusado";
+
+export const STATUS_PEDIDO: StatusPedido[] = [
+  "Rascunho", "Enviado", "Recebido", "Aprovado", "Recusado",
+];
+
+/** Uma linha de "Serviços necessários" — nasce com o texto padrão da categoria. */
+export interface ServicoPedido {
+  id: string;
+  categoria: CategoriaExterna;
+  texto: string;
+}
+
+/** O que o fornecedor lê. Gravado inteiro em `supplier_quotes.dados`. */
+export interface DocumentoPedido {
+  empresa: string;       // razão social ou nome da pessoa
+  aosCuidados: string;   // A/C
+  email: string;
+  descricao: string;     // projeto / parceria
+  modelo: string;        // "Contratação via THE ACID TIMES Ltda"
+  servicos: ServicoPedido[];
+  /** Ficha "Rótulo: valor" — mesmo formato e parser da proposta. */
+  especificacao: string;
+  execucao: string;      // data e local
+  prazoEntrega: string;
+  prazoResposta: string; // até quando o fornecedor responde
+  pagamento: string;
+  orcamentoDeve: string; // o que o orçamento dele precisa trazer
+  observacoes: string;
+  /**
+   * Cliente e marca no cabeçalho. Desligado por padrão: o fornecedor não
+   * precisa saber para quem é o job para cotar, e às vezes não pode.
+   */
+  mostrarCliente: boolean;
+}
+
+export interface PedidoFornecedor extends DocumentoPedido {
+  id: string;
+  projectId: string;
+  friendId: string | null;
+  numero: number;        // sequência dentro do projeto
+  status: StatusPedido;
+  valorCotado: number;   // em real
+  criadoEm: string;      // ISO
+  enviadoEm: string;     // ISO ou ""
+  respondidoEm: string;  // ISO ou ""
+}
+
+/* ================= AUTOCADASTRO DE FRIEND ================= */
+
+export type StatusConvite = "pendente" | "recebido" | "aprovado" | "descartado";
+
+/** O que o próprio Friend preenche. `ativo` e `receita` são da ACID, não dele. */
+export type DadosAutocadastro = Omit<Friend, "id" | "ativo" | "receita">;
+
+export interface ConviteFriend {
+  id: string;
+  token: string;
+  nome: string;          // referência interna: para quem o link foi mandado
+  status: StatusConvite;
+  dados: DadosAutocadastro | null;
+  /** Consulta à Receita feita no servidor quando o formulário chegou. */
+  receita: DadosReceita | null;
+  criadoEm: string;
+  recebidoEm: string;
+  expiraEm: string;
+  friendId: string | null;
 }
 
 /** Cliente — entidade de agrupamento de projetos/orçamentos */

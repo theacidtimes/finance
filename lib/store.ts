@@ -11,7 +11,9 @@ import type {
   ProjetoArquivo,
   TeamMember,
   Friend,
+  PedidoFornecedor,
 } from "@/types";
+import { externoDoPedido } from "@/lib/pedido-fornecedor";
 import type { ProjetoCompleto } from "@/lib/supabase/queries";
 import { SEED_ATTO } from "@/data/seed";
 import { BLOCOS_PADRAO } from "@/data/blocos";
@@ -124,6 +126,11 @@ export interface ProjetoState {
   addExternoFromFriend: (f: Friend) => void;
   updateExterno: (id: CustoExterno["id"], patch: Partial<CustoExterno>) => void;
   removeExterno: (id: CustoExterno["id"]) => void;
+  /**
+   * Pedido aprovado → custo externo. Atualiza a linha que já veio deste pedido
+   * em vez de criar outra: aprovar de novo não pode duplicar o custo no DRE.
+   */
+  lancarPedidoAprovado: (p: PedidoFornecedor, friend: Friend | null) => void;
 
   addInterno: () => void;
   addInternoFromMember: (m: TeamMember) => void;
@@ -209,6 +216,16 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
   updateExterno: (id, patch) =>
     set((s) => ({ externos: s.externos.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
   removeExterno: (id) => set((s) => ({ externos: s.externos.filter((e) => e.id !== id) })),
+  lancarPedidoAprovado: (p, friend) =>
+    set((s) => {
+      const i = s.externos.findIndex((e) => e.pedidoId === p.id);
+      if (i >= 0) {
+        const atual = s.externos[i];
+        const next = { ...externoDoPedido(p, friend, atual), id: atual.id };
+        return { externos: s.externos.map((e, j) => (j === i ? next : e)) };
+      }
+      return { externos: [...s.externos, { ...externoDoPedido(p, friend), id: novoIdOpcao() }] };
+    }),
 
   addInterno: () =>
     set((s) => ({

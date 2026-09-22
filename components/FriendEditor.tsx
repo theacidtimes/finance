@@ -7,9 +7,9 @@ import { AlertTriangle, Search } from "lucide-react";
 import { Section, Field, TextInput, Select } from "@/components/ui/primitives";
 import { BancoCombobox } from "@/components/ui/BancoCombobox";
 import { createClient } from "@/lib/supabase/client";
-import { updateFriend } from "@/lib/supabase/queries";
+import { updateFriend, type PedidoDoFriend } from "@/lib/supabase/queries";
 import { alertasDoFriend, consultaEnvelhecida, formatCNPJ, soDigitos } from "@/lib/friends";
-import { formatBRL0, formatDate } from "@/utils/format";
+import { formatBRL, formatBRL0, formatDate } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import {
   CATEGORIAS_EXTERNAS,
@@ -37,10 +37,12 @@ export type ProjetoDoFriend = {
 export function FriendEditor({
   initial,
   projetos,
+  pedidos = [],
   userEmail,
 }: {
   initial: Friend;
   projetos: ProjetoDoFriend[];
+  pedidos?: PedidoDoFriend[];
   userEmail: string;
 }) {
   const router = useRouter();
@@ -425,6 +427,40 @@ export function FriendEditor({
             </ul>
           )}
         </Section>
+
+        {pedidos.length > 0 && (
+          <Section
+            title="Pedidos de orçamento"
+            right={
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {pedidos.filter((p) => p.status === "Aprovado").length} de {pedidos.length}{" "}
+                aprovado(s)
+              </span>
+            }
+          >
+            <ul className="divide-y divide-border/60 border border-border rounded-lg overflow-hidden">
+              {pedidos.map((p) => (
+                <li
+                  key={p.id}
+                  onClick={() => router.push(`/projetos/${p.projectId}`)}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 cursor-pointer"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">
+                      {p.cliente} · {p.projeto}
+                    </div>
+                    <div className="text-xs text-muted-foreground tabular-nums">
+                      F{String(p.numero).padStart(2, "0")} · {formatDate(p.criadoEm)} · {p.status}
+                    </div>
+                  </div>
+                  <div className="text-sm tabular-nums">
+                    {p.valorCotado > 0 ? formatBRL(p.valorCotado) : "—"}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         <Section title="Observações">
           <TextInput value={f.observacoes} onChange={(v) => set("observacoes", v)} />

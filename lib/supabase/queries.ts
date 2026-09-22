@@ -17,6 +17,10 @@ import type {
   OrigemVersao,
   Friend,
   FriendResumo,
+  PedidoFornecedor,
+  ConviteFriend,
+  DadosAutocadastro,
+  DadosReceita,
 } from "@/types";
 import { computeDRE } from "@/lib/finance";
 import {
@@ -37,6 +41,9 @@ import {
   clienteToClientInsert,
   friendRowToFriend,
   friendToFriendInsert,
+  quoteRowToPedido,
+  pedidoToQuoteInsert,
+  inviteRowToConvite,
 } from "./mappers";
 import type { ProjetoBruto } from "@/lib/performance";
 import { contaNaCarteira, normalizaStatusProjeto } from "@/data/constants";
@@ -554,6 +561,161 @@ export async function updateFriend(db: DB, friend: Friend): Promise<void> {
 export async function deleteFriend(db: DB, id: string): Promise<void> {
   const { error } = await db.from("friends").delete().eq("id", id);
   if (error) throw error;
+}
+
+/* ================= PEDIDO DE ORÇAMENTO A FORNECEDOR ================= */
+
+export async function listPedidosDoProjeto(db: DB, projectId: string): Promise<PedidoFornecedor[]> {
+  const { data, error } = await db
+    .from("supplier_quotes")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("numero", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(quoteRowToPedido);
+}
+
+export async function createPedido(
+  db: DB,
+  pedido: Omit<PedidoFornecedor, "id" | "criadoEm">
+): Promise<PedidoFornecedor> {
+  const { data: user } = await db.auth.getUser();
+  const insert = { ...pedidoToQuoteInsert(pedido), created_by: user.user?.id ?? null };
+  const { data, error } = await db.from("supplier_quotes").insert(insert).select("*").single();
+  if (error) throw error;
+  return quoteRowToPedido(data);
+}
+
+export async function updatePedido(db: DB, pedido: PedidoFornecedor): Promise<void> {
+  const { id, criadoEm: _criado, ...rest } = pedido;
+  const { error } = await db.from("supplier_quotes").update(pedidoToQuoteInsert(rest)).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePedido(db: DB, id: string): Promise<void> {
+  const { error } = await db.from("supplier_quotes").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export type PedidoDoFriend = {
+  id: string;
+  projectId: string;
+  cliente: string;
+  projeto: string;
+  numero: number;
+  status: string;
+  valorCotado: number;
+  criadoEm: string;
+};
+
+/** Pedidos mandados a este Friend, com o projeto de cada um. */
+export async function listPedidosDoFriend(db: DB, friendId: string): Promise<PedidoDoFriend[]> {
+  const { data, error } = await db
+    .from("supplier_quotes")
+    .select("id, project_id, numero, status, valor_cotado, created_at, projects(cliente, projeto)")
+    .eq("friend_id", friendId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  type Linha = {
+    id: string;
+    project_id: string;
+    numero: number;
+    status: string;
+    valor_cotado: number;
+    created_at: string;
+    projects: { cliente: string; projeto: string } | null;
+  };
+  return ((data ?? []) as unknown as Linha[]).map((r) => ({
+    id: r.id,
+    projectId: r.project_id,
+    cliente: r.projects?.cliente ?? "",
+    projeto: r.projects?.projeto ?? "",
+    numero: r.numero,
+    status: r.status,
+    valorCotado: Number(r.valor_cotado ?? 0),
+    criadoEm: r.created_at,
+  }));
+}
+
+/* ================= AUTOCADASTRO DE FRIEND ================= */
+
+/** Token do link: 32 bytes aleatórios — o link é a única credencial do Friend. */
+export function novoTokenConvite(): string {
+  const b = new Uint8Array(32);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+export async function listConvites(db: DB): Promise<ConviteFriend[]> {
+  const { data, error } = await db
+    .from("friend_invites")
+    .select("*")
+    .in("status", ["pendente", "recebido"])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(inviteRowToConvite);
+}
+
+export async function createConvite(db: DB, nome: string): Promise<ConviteFriend> {
+  const { data: user } = await db.auth.getUser();
+  const { data, error } = await db
+    .from("friend_invites")
+    .insert({ token: novoTokenConvite(), nome, created_by: user.user?.id ?? null })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return inviteRowToConvite(data);
+}
+
+export async function descartarConvite(db: DB, id: string): Promise<void> {
+  const { error } = await db.from("friend_invites").update({ status: "descartado" }).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Transforma o que o Friend enviou em cadastro. Se o CNPJ já existe, o
+ * cadastro existente é atualizado em vez de duplicado (o índice único de CNPJ
+ * recusaria de qualquer forma) — e fica com o apelido e o status que a equipe
+ * já tinha dado.
+ */
+export async function aprovarConvite(
+  db: DB,
+  convite: ConviteFriend
+): Promise<{ friendId: string; atualizado: boolean }> {
+  const dados = convite.dados as DadosAutocadastro;
+  const receita: DadosReceita | null = convite.receita;
+
+  const { data: existente, error: errBusca } = await db
+    .from("friends")
+    .select("*")
+    .eq("cnpj", dados.cnpj)
+    .maybeSingle();
+  if (errBusca) throw errBusca;
+
+  let friendId: string;
+  let atualizado = false;
+  if (existente) {
+    const atual = friendRowToFriend(existente);
+    await updateFriend(db, {
+      ...atual,
+      ...dados,
+      id: atual.id,
+      nome: atual.nome || dados.nome,
+      ativo: atual.ativo,
+      receita: receita ?? atual.receita,
+    });
+    friendId = atual.id;
+    atualizado = true;
+  } else {
+    friendId = await createFriend(db, { ...dados, ativo: true, receita });
+  }
+
+  const { error } = await db
+    .from("friend_invites")
+    .update({ status: "aprovado", friend_id: friendId })
+    .eq("id", convite.id);
+  if (error) throw error;
+  return { friendId, atualizado };
 }
 
 /* ================= CLIENTES ================= */

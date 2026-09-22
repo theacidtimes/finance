@@ -1,4 +1,11 @@
-import type { Friend } from "@/types";
+import {
+  CATEGORIAS_EXTERNAS,
+  type CategoriaExterna,
+  type DadosAutocadastro,
+  type Friend,
+  type TipoConta,
+  type TipoFriend,
+} from "@/types";
 
 export function novoFriendDefaults(): Omit<Friend, "id"> {
   return {
@@ -107,4 +114,74 @@ export function consultaEnvelhecida(f: Friend, dias = 180): boolean {
   if (!f.receita?.consultadoEm) return false;
   const passados = (Date.now() - new Date(f.receita.consultadoEm).getTime()) / 86_400_000;
   return passados > dias;
+}
+
+/* ============================================================
+ * Autocadastro — o que chega do formulário público
+ * ========================================================== */
+
+export const TIPOS_FRIEND: TipoFriend[] = ["Empresa", "MEI", "Freelancer PJ", "Coletivo", "Outro"];
+export const TIPOS_CONTA: TipoConta[] = ["Corrente", "Poupança", "Pagamento"];
+
+/** Link expirado ou já usado não aceita mais envio. */
+export function conviteAberto(c: { status: string; expiraEm: string }, agora = Date.now()): boolean {
+  if (c.status !== "pendente" && c.status !== "recebido") return false;
+  const exp = new Date(c.expiraEm).getTime();
+  return Number.isNaN(exp) || exp > agora;
+}
+
+/**
+ * Limpa e valida o que o Friend enviou. Roda no SERVIDOR: o formulário não
+ * tem login e o corpo da requisição é de quem tiver o link — nada dele entra
+ * no banco sem passar por aqui (tipo, tamanho, listas fechadas).
+ *
+ * Os mínimos são os que tornam o cadastro pagável: CNPJ válido, conta
+ * completa e um jeito de falar com a pessoa. O resto a equipe completa.
+ */
+export function limparAutocadastro(entrada: unknown): {
+  dados: DadosAutocadastro;
+  erros: string[];
+} {
+  const e = (entrada && typeof entrada === "object" ? entrada : {}) as Record<string, unknown>;
+  const conta = (e.conta && typeof e.conta === "object" ? e.conta : {}) as Record<string, unknown>;
+  const txt = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+  const tipo = txt(e.tipo) as TipoFriend;
+  const tipoConta = txt(conta.tipoConta) as TipoConta;
+  const categorias = Array.isArray(e.categorias)
+    ? CATEGORIAS_EXTERNAS.filter((c) => (e.categorias as unknown[]).includes(c))
+    : ([] as CategoriaExterna[]);
+
+  const dados: DadosAutocadastro = {
+    nome: txt(e.nome, 120),
+    cnpj: soDigitos(txt(e.cnpj, 30)).slice(0, 14),
+    razaoSocial: txt(e.razaoSocial, 200),
+    tipo: TIPOS_FRIEND.includes(tipo) ? tipo : "Empresa",
+    categorias,
+    contato: txt(e.contato, 120),
+    email: txt(e.email, 160),
+    telefone: txt(e.telefone, 40),
+    site: txt(e.site, 300),
+    portfolio: txt(e.portfolio, 300),
+    observacoes: txt(e.observacoes, 2000),
+    conta: {
+      bancoCodigo: soDigitos(txt(conta.bancoCodigo, 5)).slice(0, 3),
+      bancoNome: txt(conta.bancoNome, 120),
+      agencia: txt(conta.agencia, 20),
+      conta: txt(conta.conta, 30),
+      tipoConta: TIPOS_CONTA.includes(tipoConta) ? tipoConta : "Corrente",
+      pix: txt(conta.pix, 140),
+    },
+  };
+
+  const erros: string[] = [];
+  if (!dados.nome) erros.push("Informe como você quer ser chamado.");
+  if (!cnpjValido(dados.cnpj)) erros.push("CNPJ inválido — confira os 14 dígitos.");
+  if (!dados.contato) erros.push("Informe o nome da pessoa de contato.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email)) erros.push("E-mail inválido.");
+  if (!dados.conta.bancoCodigo || !dados.conta.agencia || !dados.conta.conta) {
+    erros.push("Conta bancária incompleta — banco, agência e conta.");
+  }
+  if (!dados.categorias.length) erros.push("Marque pelo menos uma entrega.");
+  return { dados, erros };
 }
