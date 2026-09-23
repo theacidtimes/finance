@@ -13,7 +13,7 @@ import type {
   Friend,
   PedidoFornecedor,
 } from "@/types";
-import { externoDoPedido } from "@/lib/pedido-fornecedor";
+import { externoDoPedido, pedidoNoCusto } from "@/lib/pedido-fornecedor";
 import type { ProjetoCompleto } from "@/lib/supabase/queries";
 import { SEED_ATTO } from "@/data/seed";
 import { BLOCOS_PADRAO } from "@/data/blocos";
@@ -127,10 +127,13 @@ export interface ProjetoState {
   updateExterno: (id: CustoExterno["id"], patch: Partial<CustoExterno>) => void;
   removeExterno: (id: CustoExterno["id"]) => void;
   /**
-   * Pedido aprovado → custo externo. Atualiza a linha que já veio deste pedido
-   * em vez de criar outra: aprovar de novo não pode duplicar o custo no DRE.
+   * Mantém a linha de custo externo de um pedido em dia com ele: cria quando
+   * chega o valor, acompanha valor e aprovação, tira quando o pedido é
+   * recusado. Uma linha por pedido, nunca duas.
    */
-  lancarPedidoAprovado: (p: PedidoFornecedor, friend: Friend | null) => void;
+  sincronizarPedido: (p: PedidoFornecedor, friend: Friend | null) => void;
+  /** Pedido apagado: sai do custo, a menos que já tenha sido pago. */
+  soltarPedido: (pedidoId: string) => void;
 
   addInterno: () => void;
   addInternoFromMember: (m: TeamMember) => void;
@@ -216,16 +219,26 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
   updateExterno: (id, patch) =>
     set((s) => ({ externos: s.externos.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
   removeExterno: (id) => set((s) => ({ externos: s.externos.filter((e) => e.id !== id) })),
-  lancarPedidoAprovado: (p, friend) =>
+  sincronizarPedido: (p, friend) =>
     set((s) => {
       const i = s.externos.findIndex((e) => e.pedidoId === p.id);
-      if (i >= 0) {
-        const atual = s.externos[i];
-        const next = { ...externoDoPedido(p, friend, atual), id: atual.id };
-        return { externos: s.externos.map((e, j) => (j === i ? next : e)) };
+      const atual = i >= 0 ? s.externos[i] : undefined;
+      if (!pedidoNoCusto(p)) {
+        // Pago não some: é dinheiro que já saiu, recusado ou não.
+        if (!atual || atual.status === "Pago") return {};
+        return { externos: s.externos.filter((_, j) => j !== i) };
       }
-      return { externos: [...s.externos, { ...externoDoPedido(p, friend), id: novoIdOpcao() }] };
+      const next = { ...externoDoPedido(p, friend, atual), id: atual?.id ?? novoIdOpcao() };
+      // Nada mudou: não mexe no estado, senão o autosave grava à toa.
+      if (atual && JSON.stringify(atual) === JSON.stringify(next)) return {};
+      return atual
+        ? { externos: s.externos.map((e, j) => (j === i ? next : e)) }
+        : { externos: [...s.externos, next] };
     }),
+  soltarPedido: (pedidoId) =>
+    set((s) => ({
+      externos: s.externos.filter((e) => e.pedidoId !== pedidoId || e.status === "Pago"),
+    })),
 
   addInterno: () =>
     set((s) => ({

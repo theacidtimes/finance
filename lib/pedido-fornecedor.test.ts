@@ -202,9 +202,9 @@ describe("documento", () => {
   });
 });
 
-describe("aprovação vira custo externo", () => {
+describe("cotação vira custo externo", () => {
   it("cria a linha com o valor cotado, Friend e vínculo com o pedido", () => {
-    const e = externoDoPedido(pedido({ valorCotado: 8500 }), friend());
+    const e = externoDoPedido(pedido({ valorCotado: 8500, status: "Aprovado" }), friend());
     expect(e).toMatchObject({
       nome: "Estúdio Luz",
       categoria: "Fotografia",
@@ -214,6 +214,19 @@ describe("aprovação vira custo externo", () => {
       friendId: "fr-1",
       pedidoId: "pd-1",
     });
+  });
+
+  it("antes de aprovar, entra como Orçado", () => {
+    expect(externoDoPedido(pedido({ valorCotado: 8500, status: "Recebido" }), friend()).status).toBe(
+      "Orçado"
+    );
+  });
+
+  it("recusado ou sem valor não entra no custo", async () => {
+    const { pedidoNoCusto } = await import("./pedido-fornecedor");
+    expect(pedidoNoCusto({ valorCotado: 100, status: "Recebido" })).toBe(true);
+    expect(pedidoNoCusto({ valorCotado: 100, status: "Recusado" })).toBe(false);
+    expect(pedidoNoCusto({ valorCotado: 0, status: "Aprovado" })).toBe(false);
   });
 
   it("fornecedor avulso usa o nome da empresa do pedido", () => {
