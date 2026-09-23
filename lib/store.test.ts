@@ -197,3 +197,56 @@ describe("custo de câmbio no DRE", () => {
     expect(linha()?.valor).toBe(0);
   });
 });
+
+/**
+ * Pedido aprovado vira custo externo — uma linha por pedido, nunca duas.
+ * Aprovar de novo (valor corrigido) atualiza a mesma linha: o DRE não pode
+ * contar a mesma cotação duas vezes.
+ */
+describe("pedido de orçamento aprovado", () => {
+  const st = () => useProjetoStore.getState();
+  const pedido = {
+    id: "pd-teste",
+    projectId: "pj",
+    friendId: null,
+    numero: 1,
+    status: "Aprovado" as const,
+    valorCotado: 5000,
+    criadoEm: "",
+    enviadoEm: "",
+    respondidoEm: "",
+    empresa: "Foto Avulsa",
+    aosCuidados: "",
+    email: "",
+    descricao: "",
+    modelo: "",
+    servicos: [{ id: "s1", categoria: "Fotografia" as const, texto: "1 diária" }],
+    especificacao: "",
+    execucao: "",
+    prazoEntrega: "",
+    prazoResposta: "",
+    pagamento: "",
+    orcamentoDeve: "",
+    observacoes: "",
+    mostrarCliente: false,
+  };
+
+  beforeEach(() => {
+    st().hydrate({ externos: [] });
+  });
+
+  it("cria a linha na primeira aprovação", () => {
+    st().lancarPedidoAprovado(pedido, null);
+    expect(st().externos).toHaveLength(1);
+    expect(st().externos[0]).toMatchObject({ nome: "Foto Avulsa", valor: 5000, pedidoId: "pd-teste" });
+  });
+
+  it("reaprovar atualiza a mesma linha, sem duplicar", () => {
+    st().lancarPedidoAprovado(pedido, null);
+    const id = st().externos[0].id;
+    st().updateExterno(id, { nf: true });
+    st().lancarPedidoAprovado({ ...pedido, valorCotado: 6200 }, null);
+    expect(st().externos).toHaveLength(1);
+    expect(st().externos[0]).toMatchObject({ id, valor: 6200, nf: true });
+  });
+});

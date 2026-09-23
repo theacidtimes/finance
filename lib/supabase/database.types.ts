@@ -48,6 +48,7 @@ export type Database = {
           nome: string
           obs: string | null
           ordem: number
+          pedido_id: string | null
           project_id: string
           status: string
           valor: number
@@ -63,6 +64,7 @@ export type Database = {
           nome?: string
           obs?: string | null
           ordem?: number
+          pedido_id?: string | null
           project_id: string
           status?: string
           valor?: number
@@ -401,6 +403,70 @@ export type Database = {
           versao: number
         }
         Update: Partial<Database["public"]["Tables"]["project_versions"]["Insert"]>
+        Relationships: []
+      }
+      supplier_quotes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dados: Json
+          enviado_em: string | null
+          friend_id: string | null
+          id: string
+          numero: number
+          project_id: string
+          respondido_em: string | null
+          status: string
+          updated_at: string
+          valor_cotado: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dados?: Json
+          enviado_em?: string | null
+          friend_id?: string | null
+          id?: string
+          numero?: number
+          project_id: string
+          respondido_em?: string | null
+          status?: string
+          updated_at?: string
+          valor_cotado?: number
+        }
+        Update: Partial<Database["public"]["Tables"]["supplier_quotes"]["Insert"]>
+        Relationships: []
+      }
+      friend_invites: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dados: Json | null
+          expira_em: string
+          friend_id: string | null
+          id: string
+          nome: string
+          receita: Json | null
+          recebido_em: string | null
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dados?: Json | null
+          expira_em?: string
+          friend_id?: string | null
+          id?: string
+          nome?: string
+          receita?: Json | null
+          recebido_em?: string | null
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["friend_invites"]["Insert"]>
         Relationships: []
       }
     }

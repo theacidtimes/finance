@@ -18,7 +18,14 @@ import type {
   DadosReceita,
   MoedaProposta,
   OpcaoComercial,
+  PedidoFornecedor,
+  DocumentoPedido,
+  StatusPedido,
+  ConviteFriend,
+  StatusConvite,
+  DadosAutocadastro,
 } from "@/types";
+import { STATUS_PEDIDO } from "@/types";
 import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
 import { normalizaStatusProjeto } from "@/data/constants";
@@ -40,6 +47,9 @@ type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
 type FriendRow = Database["public"]["Tables"]["friends"]["Row"];
 type FriendInsert = Database["public"]["Tables"]["friends"]["Insert"];
+type QuoteRow = Database["public"]["Tables"]["supplier_quotes"]["Row"];
+type QuoteInsert = Database["public"]["Tables"]["supplier_quotes"]["Insert"];
+type InviteRow = Database["public"]["Tables"]["friend_invites"]["Row"];
 
 const num = (v: number | null | undefined) => Number(v ?? 0);
 
@@ -129,6 +139,7 @@ export function externalRowToCusto(row: ExternalRow): CustoExterno {
     dataPagamento: row.data_pagamento ?? "",
     obs: row.obs ?? "",
     friendId: row.friend_id ?? null,
+    pedidoId: row.pedido_id ?? null,
   };
 }
 
@@ -149,6 +160,7 @@ export function custoToExternalInsert(
     data_pagamento: c.dataPagamento || null,
     obs: c.obs,
     friend_id: c.friendId ?? null,
+    pedido_id: c.pedidoId ?? null,
   };
 }
 
@@ -347,5 +359,83 @@ export function clienteToClientInsert(c: Omit<Cliente, "id">): ClientInsert {
     email: c.email,
     telefone: c.telefone,
     observacoes: c.observacoes,
+  };
+}
+
+/* ---------------- PEDIDO DE ORÇAMENTO A FORNECEDOR ---------------- */
+
+/** Documento vazio: base para ler um `dados` gravado antes de algum campo existir. */
+const DOCUMENTO_VAZIO: DocumentoPedido = {
+  empresa: "",
+  aosCuidados: "",
+  email: "",
+  descricao: "",
+  modelo: "",
+  servicos: [],
+  especificacao: "",
+  execucao: "",
+  prazoEntrega: "",
+  prazoResposta: "",
+  pagamento: "",
+  orcamentoDeve: "",
+  observacoes: "",
+  mostrarCliente: false,
+};
+
+export function quoteRowToPedido(row: QuoteRow): PedidoFornecedor {
+  const dados = (row.dados ?? {}) as unknown as Partial<DocumentoPedido>;
+  return {
+    ...DOCUMENTO_VAZIO,
+    ...dados,
+    servicos: Array.isArray(dados.servicos) ? dados.servicos : [],
+    id: row.id,
+    projectId: row.project_id,
+    friendId: row.friend_id ?? null,
+    numero: row.numero,
+    status: (STATUS_PEDIDO.includes(row.status as StatusPedido)
+      ? row.status
+      : "Rascunho") as StatusPedido,
+    valorCotado: num(row.valor_cotado),
+    criadoEm: row.created_at,
+    enviadoEm: row.enviado_em ?? "",
+    respondidoEm: row.respondido_em ?? "",
+  };
+}
+
+export function pedidoToQuoteInsert(p: Omit<PedidoFornecedor, "id" | "criadoEm">): QuoteInsert {
+  const {
+    projectId, friendId, numero, status, valorCotado, enviadoEm, respondidoEm,
+    ...documento
+  } = p;
+  return {
+    project_id: projectId,
+    friend_id: friendId,
+    numero,
+    status,
+    valor_cotado: valorCotado,
+    enviado_em: enviadoEm || null,
+    respondido_em: respondidoEm || null,
+    dados: documento as unknown as QuoteInsert["dados"],
+  };
+}
+
+/* ---------------- AUTOCADASTRO DE FRIEND ---------------- */
+
+const STATUS_CONVITE: StatusConvite[] = ["pendente", "recebido", "aprovado", "descartado"];
+
+export function inviteRowToConvite(row: InviteRow): ConviteFriend {
+  return {
+    id: row.id,
+    token: row.token,
+    nome: row.nome ?? "",
+    status: (STATUS_CONVITE.includes(row.status as StatusConvite)
+      ? row.status
+      : "pendente") as StatusConvite,
+    dados: (row.dados as unknown as DadosAutocadastro | null) ?? null,
+    receita: (row.receita as unknown as DadosReceita | null) ?? null,
+    criadoEm: row.created_at,
+    recebidoEm: row.recebido_em ?? "",
+    expiraEm: row.expira_em,
+    friendId: row.friend_id ?? null,
   };
 }

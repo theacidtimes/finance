@@ -31,8 +31,11 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAuthRoute = path === "/login" || path.startsWith("/auth");
+  // Autocadastro de Friend: quem abre não tem conta. As rotas validam o token
+  // e gravam só no convite dele (ver app/api/convite-friend).
+  const isPublica = path.startsWith("/cadastro/") || path.startsWith("/api/convite-friend/");
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublica) {
     // Chamada de API não pode virar página de login: o fetch do cliente segue o
     // redirect, recebe o HTML do /login onde esperava JSON, e o erro real
     // (sessão expirada) chega na tela como "falha" genérica.

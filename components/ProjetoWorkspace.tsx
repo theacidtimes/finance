@@ -13,14 +13,23 @@ import { Pessoas } from "@/components/screens/Pessoas";
 import { DRE } from "@/components/screens/DRE";
 import { Simulador } from "@/components/screens/Simulador";
 import { Orcamento } from "@/components/screens/Orcamento";
+import { PedidosFornecedor } from "@/components/screens/PedidosFornecedor";
 import { cn } from "@/lib/utils";
 
-type TabId = "dashboard" | "projeto" | "pessoas" | "dre" | "simulador" | "orcamento";
+type TabId =
+  | "dashboard"
+  | "projeto"
+  | "pessoas"
+  | "fornecedores"
+  | "dre"
+  | "simulador"
+  | "orcamento";
 
 const TABS: [TabId, string][] = [
   ["dashboard", "Dashboard"],
   ["projeto", "Projeto"],
   ["pessoas", "Pessoas & Custos"],
+  ["fornecedores", "Fornecedores"],
   ["dre", "DRE"],
   ["simulador", "Simulador"],
   ["orcamento", "Orçamento"],
@@ -169,6 +178,7 @@ export function ProjetoWorkspace({
         {tab === "dashboard" && <Dashboard />}
         {tab === "projeto" && <Cadastro />}
         {tab === "pessoas" && <Pessoas />}
+        {tab === "fornecedores" && <PedidosFornecedor />}
         {tab === "dre" && <DRE />}
         {tab === "simulador" && <Simulador />}
         {tab === "orcamento" && <Orcamento />}

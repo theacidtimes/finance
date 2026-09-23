@@ -464,3 +464,76 @@ create policy "master apaga friends" on friends for delete to authenticated usin
 -- vínculo da linha de custo externo com o cadastro (null = avulso)
 alter table external_costs add column if not exists friend_id uuid references friends(id) on delete set null;
 create index if not exists idx_external_costs_friend on external_costs(friend_id);
+
+-- ========== PEDIDO DE ORÇAMENTO A FORNECEDOR ==========
+-- O caminho inverso da proposta: a ACID pede preço a um Friend (ou a um
+-- fornecedor avulso). O documento inteiro vai em `dados` (DocumentoPedido);
+-- o que se filtra e soma fica em coluna.
+-- Quando o pedido é aprovado, o valor cotado vira linha de custo externo. Quem
+-- aponta é a LINHA (external_costs.pedido_id), não o pedido: o autosave apaga
+-- e regrava os custos externos, e o id da linha muda a cada gravação.
+create table if not exists supplier_quotes (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+  project_id uuid not null references projects(id) on delete cascade,
+  friend_id uuid references friends(id) on delete set null,
+  numero int not null default 1,
+  status text not null default 'Rascunho'
+    check (status in ('Rascunho','Enviado','Recebido','Aprovado','Recusado')),
+  valor_cotado numeric(14,2) not null default 0,
+  enviado_em timestamptz,
+  respondido_em timestamptz,
+  dados jsonb not null default '{}'::jsonb,
+  unique (project_id, numero)
+);
+create index if not exists idx_supplier_quotes_project on supplier_quotes(project_id);
+create index if not exists idx_supplier_quotes_friend on supplier_quotes(friend_id);
+
+drop trigger if exists supplier_quotes_updated_at on supplier_quotes;
+create trigger supplier_quotes_updated_at before update on supplier_quotes
+  for each row execute function set_updated_at();
+
+alter table supplier_quotes enable row level security;
+create policy "equipe le pedidos"    on supplier_quotes for select to authenticated using (true);
+create policy "equipe cria pedidos"  on supplier_quotes for insert to authenticated with check (true);
+create policy "equipe edita pedidos" on supplier_quotes for update to authenticated using (true);
+create policy "equipe apaga pedidos" on supplier_quotes for delete to authenticated using (true);
+
+-- Sem FK de propósito: o pedido pode ser apagado depois de aprovado, e uma FK
+-- faria o autosave do projeto (que regrava as linhas) falhar com a linha
+-- ainda apontando para ele.
+alter table external_costs add column if not exists pedido_id uuid;
+
+-- ========== AUTOCADASTRO DE FRIEND ==========
+-- A equipe gera um link (/cadastro/[token]); o próprio Friend preenche CNPJ,
+-- contato, entregas e conta. Nada entra em `friends` sem alguém aprovar.
+-- O Friend não tem login: a rota Next valida o token e grava com service_role
+-- — por isso não há policy anônima aqui, igual a `briefings`.
+create table if not exists friend_invites (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+  token text not null unique,
+  nome text not null default '',          -- referência interna: para quem foi o link
+  status text not null default 'pendente'
+    check (status in ('pendente','recebido','aprovado','descartado')),
+  dados jsonb,                            -- DadosAutocadastro, como o Friend enviou
+  receita jsonb,                          -- consulta à Receita feita no servidor ao receber
+  recebido_em timestamptz,
+  expira_em timestamptz not null default (now() + interval '30 days'),
+  friend_id uuid references friends(id) on delete set null
+);
+create index if not exists idx_friend_invites_status on friend_invites(status);
+
+drop trigger if exists friend_invites_updated_at on friend_invites;
+create trigger friend_invites_updated_at before update on friend_invites
+  for each row execute function set_updated_at();
+
+alter table friend_invites enable row level security;
+create policy "equipe le convites"    on friend_invites for select to authenticated using (true);
+create policy "equipe cria convites"  on friend_invites for insert to authenticated with check (true);
+create policy "equipe edita convites" on friend_invites for update to authenticated using (true);
+create policy "equipe apaga convites" on friend_invites for delete to authenticated using (true);
