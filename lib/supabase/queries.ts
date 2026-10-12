@@ -23,6 +23,7 @@ import type {
   DadosReceita,
 } from "@/types";
 import { computeDRE } from "@/lib/finance";
+import { resumirCustosPorFriend } from "@/lib/friends";
 import {
   projectRowToProjeto,
   projetoToProjectInsert,
@@ -466,7 +467,7 @@ export async function listFriends(db: DB): Promise<Friend[]> {
 export async function listFriendsResumo(db: DB): Promise<FriendResumo[]> {
   const [friendsRes, custosRes, projRes] = await Promise.all([
     db.from("friends").select("*").order("ativo", { ascending: false }).order("nome"),
-    db.from("external_costs").select("friend_id, valor, project_id"),
+    db.from("external_costs").select("friend_id, valor, status, project_id"),
     db.from("projects").select("id, data, updated_at"),
   ]);
   if (friendsRes.error) throw friendsRes.error;
@@ -477,18 +478,7 @@ export async function listFriendsResumo(db: DB): Promise<FriendResumo[]> {
     (projRes.data ?? []).map((p) => [p.id, p.data ?? p.updated_at ?? ""])
   );
 
-  const agg = new Map<string, { total: number; projetos: Set<string>; ultimo: string }>();
-  for (const c of custosRes.data ?? []) {
-    if (!c.friend_id) continue;
-    const cur = agg.get(c.friend_id) ?? { total: 0, projetos: new Set<string>(), ultimo: "" };
-    cur.total += Number(c.valor ?? 0);
-    if (c.project_id) {
-      cur.projetos.add(c.project_id);
-      const d = dataDoProjeto.get(c.project_id) ?? "";
-      if (d > cur.ultimo) cur.ultimo = d;
-    }
-    agg.set(c.friend_id, cur);
-  }
+  const agg = resumirCustosPorFriend(custosRes.data ?? [], dataDoProjeto);
 
   return (friendsRes.data ?? []).map((row) => {
     const f = friendRowToFriend(row);
