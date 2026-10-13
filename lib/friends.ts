@@ -117,6 +117,44 @@ export function consultaEnvelhecida(f: Friend, dias = 180): boolean {
 }
 
 /* ============================================================
+ * Resumo do que passou pelo Friend
+ * ========================================================== */
+
+export type CustoVinculado = {
+  friend_id: string | null;
+  valor: number | string | null;
+  status: string | null;
+  project_id: string | null;
+};
+
+export type ResumoFriend = { total: number; projetos: Set<string>; ultimo: string };
+
+/**
+ * "Já repassado" é dinheiro que saiu: só linha com status Pago soma. Orçado e
+ * Aprovado ainda podem mudar ou não acontecer — e duas opções alternativas do
+ * mesmo job contariam em dobro. Os projetos, porém, contam todos os vínculos:
+ * é com esse número que o card avisa o que fica órfão ao apagar o Friend.
+ */
+export function resumirCustosPorFriend(
+  custos: CustoVinculado[],
+  dataDoProjeto: Map<string, string>
+): Map<string, ResumoFriend> {
+  const agg = new Map<string, ResumoFriend>();
+  for (const c of custos) {
+    if (!c.friend_id) continue;
+    const cur = agg.get(c.friend_id) ?? { total: 0, projetos: new Set<string>(), ultimo: "" };
+    if (c.status === "Pago") cur.total += Number(c.valor ?? 0);
+    if (c.project_id) {
+      cur.projetos.add(c.project_id);
+      const d = dataDoProjeto.get(c.project_id) ?? "";
+      if (d > cur.ultimo) cur.ultimo = d;
+    }
+    agg.set(c.friend_id, cur);
+  }
+  return agg;
+}
+
+/* ============================================================
  * Autocadastro — o que chega do formulário público
  * ========================================================== */
 
