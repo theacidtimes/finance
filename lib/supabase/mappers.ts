@@ -30,6 +30,7 @@ import type { Database } from "./database.types";
 import { BLOCOS_PADRAO } from "@/data/blocos";
 import { normalizaStatusProjeto } from "@/data/constants";
 import { MOEDAS } from "@/lib/moeda";
+import { formatDate, parseDateBR } from "@/utils/format";
 
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
@@ -136,7 +137,7 @@ export function externalRowToCusto(row: ExternalRow): CustoExterno {
     valor: num(row.valor),
     status: (row.status as StatusCustoExterno) ?? "Orçado",
     nf: row.nf,
-    dataPagamento: row.data_pagamento ?? "",
+    dataPagamento: formatDate(row.data_pagamento),
     obs: row.obs ?? "",
     friendId: row.friend_id ?? null,
     pedidoId: row.pedido_id ?? null,
@@ -157,7 +158,7 @@ export function custoToExternalInsert(
     valor: c.valor,
     status: c.status,
     nf: c.nf,
-    data_pagamento: c.dataPagamento || null,
+    data_pagamento: parseDateBR(c.dataPagamento),
     obs: c.obs,
     friend_id: c.friendId ?? null,
     pedido_id: c.pedidoId ?? null,
