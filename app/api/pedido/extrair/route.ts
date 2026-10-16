@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { ehEquipe } from "@/lib/supabase/acesso";
 import {
   FERRAMENTA,
   MODELO,
@@ -11,7 +12,7 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Qualquer usuário autenticado pode extrair um pedido. */
+/** Qualquer usuário da equipe (master/gestor) pode extrair um pedido. */
 async function requireUser() {
   const supabase = await createClient();
   const {
@@ -19,6 +20,9 @@ async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) {
     return { error: NextResponse.json({ error: "Não autenticado." }, { status: 401 }) };
+  }
+  if (!(await ehEquipe(supabase))) {
+    return { error: NextResponse.json({ error: "Acesso restrito à equipe." }, { status: 403 }) };
   }
   return { userId: user.id };
 }

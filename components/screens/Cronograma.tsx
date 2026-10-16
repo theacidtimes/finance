@@ -172,7 +172,11 @@ function LinhaDoTempo({
   );
 }
 
-export function Cronograma() {
+/**
+ * `comProposta` = false no acesso do GP: ele não enxerga nem grava a proposta,
+ * então o botão que preenche os marcos dela não aparece.
+ */
+export function Cronograma({ comProposta = true }: { comProposta?: boolean } = {}) {
   const proj = useProjetoStore((s) => s.proj);
   const crono = useProjetoStore((s) => s.crono);
   const cronogramaProposta = useProjetoStore((s) => s.cronograma);
@@ -257,13 +261,15 @@ export function Cronograma() {
         title="Cronograma de produção"
         right={
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={levarParaProposta}
-              className="text-xs px-3 py-1.5 rounded-md border border-input hover:bg-muted"
-              title="Preenche o bloco Cronograma da proposta com as entregas (★)"
-            >
-              Levar entregas para a proposta
-            </button>
+            {comProposta && (
+              <button
+                onClick={levarParaProposta}
+                className="text-xs px-3 py-1.5 rounded-md border border-input hover:bg-muted"
+                title="Preenche o bloco Cronograma da proposta com as entregas (★)"
+              >
+                Levar entregas para a proposta
+              </button>
+            )}
             <button
               onClick={gerarPDF}
               disabled={gerando || !tarefas.length}
@@ -545,7 +551,7 @@ export function Cronograma() {
         <p className="text-xs text-muted-foreground mt-3">
           Duração em dias úteis — 0,5 é meio período. Início e fim são calculados: a tarefa começa quando a
           predecessora termina. Escolher uma data no início fixa um “não antes de” (fica em amarelo). ★ marca as
-          entregas: saem em destaque no PDF e vão para a proposta.
+          entregas: saem em destaque no PDF{comProposta ? " e vão para a proposta" : ""}.
         </p>
       </Section>
 

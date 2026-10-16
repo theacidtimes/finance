@@ -12,6 +12,7 @@ import { PERMISSOES, type Perfil, type PermissionKey, type Permissions, type Rol
 const roleTone: Record<Role, string> = {
   master: "bg-acid/15 text-acid-dark border-acid/30",
   gestor: "bg-blue-50 text-blue-700 border-blue-200",
+  producao: "bg-amber-50 text-amber-800 border-amber-200",
 };
 
 const emptyForm = {
@@ -207,6 +208,7 @@ export function UsuariosAdmin({
                 className={fieldCls}
               >
                 <option value="gestor">Gestor</option>
+                <option value="producao">Produção (GP)</option>
                 <option value="master">Master</option>
               </select>
             </label>
@@ -226,6 +228,12 @@ export function UsuariosAdmin({
                 </label>
               ))}
             </div>
+          )}
+          {form.role === "producao" && (
+            <p className="text-xs text-muted-foreground">
+              Vê só a lista de projetos e monta o cronograma. Não vê valores, DRE, custos, time,
+              fornecedores nem orçamento — o banco não entrega esses dados a este perfil.
+            </p>
           )}
           {form.role === "master" && (
             <p className="text-xs text-muted-foreground">
@@ -295,6 +303,7 @@ export function UsuariosAdmin({
                       className={`text-[11px] px-2 py-1 rounded-full border tabular-nums disabled:opacity-60 ${roleTone[p.role]}`}
                     >
                       <option value="gestor">Gestor</option>
+                      <option value="producao">Produção (GP)</option>
                       <option value="master">Master</option>
                     </select>
                   </td>
@@ -303,10 +312,16 @@ export function UsuariosAdmin({
                       <input
                         type="checkbox"
                         className="accent-acid w-4 h-4 disabled:opacity-50"
-                        checked={isMaster ? true : !!p.permissions[perm.key]}
-                        disabled={isMaster || disabled}
+                        checked={isMaster ? true : p.role === "producao" ? false : !!p.permissions[perm.key]}
+                        disabled={isMaster || p.role === "producao" || disabled}
                         onChange={(e) => togglePerm(p, perm.key, e.target.checked)}
-                        title={isMaster ? "Master tem todas as permissões" : perm.desc}
+                        title={
+                          isMaster
+                            ? "Master tem todas as permissões"
+                            : p.role === "producao"
+                              ? "Produção não tem acesso a clientes nem orçamento"
+                              : perm.desc
+                        }
                       />
                     </td>
                   ))}

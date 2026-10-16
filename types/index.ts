@@ -436,7 +436,13 @@ export interface ClienteResumo extends Cliente {
 }
 
 /** Papéis de acesso do sistema */
-export type Role = "master" | "gestor";
+/**
+ * - `master`   — tudo, inclusive usuários e Performance
+ * - `gestor`   — tudo menos usuários e Performance
+ * - `producao` — o GP: só a lista de projetos e o cronograma; nenhum número.
+ *   A barreira é o banco (ver supabase/schema.sql, "PERFIL PRODUÇÃO"), não a tela.
+ */
+export type Role = "master" | "gestor" | "producao";
 
 /** Chaves de permissão configuráveis por perfil (master sempre tem todas) */
 export type PermissionKey = "criar_clientes" | "gerar_orcamento";
