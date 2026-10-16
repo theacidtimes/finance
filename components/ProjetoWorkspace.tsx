@@ -14,6 +14,7 @@ import { DRE } from "@/components/screens/DRE";
 import { Simulador } from "@/components/screens/Simulador";
 import { Orcamento } from "@/components/screens/Orcamento";
 import { PedidosFornecedor } from "@/components/screens/PedidosFornecedor";
+import { Cronograma } from "@/components/screens/Cronograma";
 import { cn } from "@/lib/utils";
 
 type TabId =
@@ -23,7 +24,8 @@ type TabId =
   | "fornecedores"
   | "dre"
   | "simulador"
-  | "orcamento";
+  | "orcamento"
+  | "crono";
 
 const TABS: [TabId, string][] = [
   ["dashboard", "Dashboard"],
@@ -33,12 +35,13 @@ const TABS: [TabId, string][] = [
   ["dre", "DRE"],
   ["simulador", "Simulador"],
   ["orcamento", "Orçamento"],
+  ["crono", "Cronograma"],
 ];
 
 type SaveStatus = "saved" | "saving" | "error";
 
 const sigOf = (c: Omit<ProjetoCompleto, "id">) =>
-  JSON.stringify([c.proj, c.externos, c.internos, c.cronograma, c.opcoes, c.blocos]);
+  JSON.stringify([c.proj, c.externos, c.internos, c.cronograma, c.opcoes, c.blocos, c.crono]);
 
 export function ProjetoWorkspace({
   initial,
@@ -57,6 +60,7 @@ export function ProjetoWorkspace({
   const cronograma = useProjetoStore((s) => s.cronograma);
   const opcoes = useProjetoStore((s) => s.opcoes);
   const blocos = useProjetoStore((s) => s.blocos);
+  const crono = useProjetoStore((s) => s.crono);
   const hydrate = useProjetoStore((s) => s.hydrate);
 
   const readyRef = useRef(false);
@@ -74,6 +78,7 @@ export function ProjetoWorkspace({
       cronograma: initial.cronograma,
       opcoes: initial.opcoes,
       blocos: initial.blocos,
+      crono: initial.crono ?? null,
     });
     lastSig.current = sigOf(initial);
     readyRef.current = true;
@@ -81,7 +86,7 @@ export function ProjetoWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial.id]);
 
-  const sig = sigOf({ proj, externos, internos, cronograma, opcoes, blocos });
+  const sig = sigOf({ proj, externos, internos, cronograma, opcoes, blocos, crono });
 
   useEffect(() => {
     if (!readyRef.current) return;
@@ -119,7 +124,8 @@ export function ProjetoWorkspace({
   // assinatura, senão o autosave dispararia de volta o que acabou de ser gravado.
   const aoRestaurar = (restaurado: ProjetoCompleto) => {
     hydrate(restaurado);
-    lastSig.current = sigOf(restaurado);
+    // Do store, e não do restaurado: o cronograma não volta com a versão.
+    lastSig.current = sigOf(completoDoStore());
     lastStatus.current = restaurado.proj.status;
     setStatus("saved");
     router.refresh();
@@ -182,6 +188,7 @@ export function ProjetoWorkspace({
         {tab === "dre" && <DRE />}
         {tab === "simulador" && <Simulador />}
         {tab === "orcamento" && <Orcamento />}
+        {tab === "crono" && <Cronograma />}
       </main>
     </div>
   );

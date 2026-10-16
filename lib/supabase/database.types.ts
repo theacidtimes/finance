@@ -274,6 +274,7 @@ export type Database = {
       projects: {
         Row: {
           blocos: Json
+          crono: Json | null
           cambio: number
           cambio_data: string
           cliente: string
@@ -309,6 +310,7 @@ export type Database = {
         }
         Insert: {
           blocos?: Json
+          crono?: Json | null
           cambio?: number
           cambio_data?: string
           cliente: string

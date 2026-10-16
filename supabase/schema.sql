@@ -84,6 +84,11 @@ alter table projects add column if not exists sem_clausula_ia boolean not null d
 alter table projects add column if not exists roteiro_url   text default '';
 alter table projects add column if not exists roteiro_label text default '';
 
+-- cronograma de produção (aba Cronograma). Um documento só, em jsonb: as datas
+-- são derivadas (duração + predecessora, ver lib/crono.ts), então não há o que
+-- consultar por linha. Fica fora de project_versions de propósito.
+alter table projects add column if not exists crono jsonb;
+
 -- ========== CUSTOS EXTERNOS / REPASSES ==========
 create table if not exists external_costs (
   id uuid primary key default gen_random_uuid(),
