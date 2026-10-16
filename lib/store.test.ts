@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjetoStore } from "./store";
+import type { PedidoFornecedor } from "@/types";
 
 /**
  * O valor em real de um projeto em moeda estrangeira é derivado, não digitado.
@@ -199,18 +200,18 @@ describe("custo de câmbio no DRE", () => {
 });
 
 /**
- * Pedido aprovado vira custo externo — uma linha por pedido, nunca duas.
- * Aprovar de novo (valor corrigido) atualiza a mesma linha: o DRE não pode
- * contar a mesma cotação duas vezes.
+ * A cotação de um pedido vira linha de custo externo — uma por pedido, nunca
+ * duas. Orçado enquanto não é aprovada, Aprovado depois, e sai quando o pedido
+ * é recusado: senão cotar o mesmo serviço com três fornecedores somaria os três.
  */
-describe("pedido de orçamento aprovado", () => {
+describe("pedido de orçamento em Pessoas & Custos", () => {
   const st = () => useProjetoStore.getState();
   const pedido = {
     id: "pd-teste",
     projectId: "pj",
     friendId: null,
     numero: 1,
-    status: "Aprovado" as const,
+    status: "Recebido" as PedidoFornecedor["status"],
     valorCotado: 5000,
     criadoEm: "",
     enviadoEm: "",
@@ -230,23 +231,63 @@ describe("pedido de orçamento aprovado", () => {
     observacoes: "",
     mostrarCliente: false,
   };
+  const sync = (p: Parameters<ReturnType<typeof st>["sincronizarPedido"]>[0]) =>
+    st().sincronizarPedido(p, null);
 
   beforeEach(() => {
     st().hydrate({ externos: [] });
   });
 
-  it("cria a linha na primeira aprovação", () => {
-    st().lancarPedidoAprovado(pedido, null);
-    expect(st().externos).toHaveLength(1);
-    expect(st().externos[0]).toMatchObject({ nome: "Foto Avulsa", valor: 5000, pedidoId: "pd-teste" });
+  it("sem valor não entra", () => {
+    sync({ ...pedido, status: "Enviado", valorCotado: 0 });
+    expect(st().externos).toHaveLength(0);
   });
 
-  it("reaprovar atualiza a mesma linha, sem duplicar", () => {
-    st().lancarPedidoAprovado(pedido, null);
+  it("valor recebido entra como Orçado", () => {
+    sync(pedido);
+    expect(st().externos).toHaveLength(1);
+    expect(st().externos[0]).toMatchObject({
+      nome: "Foto Avulsa",
+      valor: 5000,
+      status: "Orçado",
+      pedidoId: "pd-teste",
+    });
+  });
+
+  it("mudar o valor e aprovar atualizam a mesma linha, sem duplicar", () => {
+    sync(pedido);
     const id = st().externos[0].id;
     st().updateExterno(id, { nf: true });
-    st().lancarPedidoAprovado({ ...pedido, valorCotado: 6200 }, null);
+    sync({ ...pedido, valorCotado: 6200 });
+    sync({ ...pedido, valorCotado: 6200, status: "Aprovado" });
     expect(st().externos).toHaveLength(1);
-    expect(st().externos[0]).toMatchObject({ id, valor: 6200, nf: true });
+    expect(st().externos[0]).toMatchObject({ id, valor: 6200, nf: true, status: "Aprovado" });
+  });
+
+  it("recusado sai do custo", () => {
+    sync(pedido);
+    sync({ ...pedido, status: "Recusado" });
+    expect(st().externos).toHaveLength(0);
+  });
+
+  it("pago não sai, nem recusado nem apagado", () => {
+    sync(pedido);
+    st().updateExterno(st().externos[0].id, { status: "Pago" });
+    sync({ ...pedido, status: "Recusado" });
+    st().soltarPedido("pd-teste");
+    expect(st().externos).toHaveLength(1);
+  });
+
+  it("pedido apagado solta a linha", () => {
+    sync(pedido);
+    st().soltarPedido("pd-teste");
+    expect(st().externos).toHaveLength(0);
+  });
+
+  it("sincronizar sem mudança não troca o estado (não dispara autosave)", () => {
+    sync(pedido);
+    const antes = st().externos;
+    sync(pedido);
+    expect(st().externos).toBe(antes);
   });
 });

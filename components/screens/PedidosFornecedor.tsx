@@ -219,7 +219,8 @@ export function PedidosFornecedor() {
   const proj = useProjetoStore((s) => s.proj);
   const blocos = useProjetoStore((s) => s.blocos);
   const externos = useProjetoStore((s) => s.externos);
-  const lancarPedidoAprovado = useProjetoStore((s) => s.lancarPedidoAprovado);
+  const sincronizarPedido = useProjetoStore((s) => s.sincronizarPedido);
+  const soltarPedido = useProjetoStore((s) => s.soltarPedido);
 
   const [pedidos, setPedidos] = useState<PedidoFornecedor[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -292,6 +293,16 @@ export function PedidosFornecedor() {
   const ativos = useMemo(() => friends.filter((f) => f.ativo), [friends]);
   const friendDe = (id: string | null) => (id ? friends.find((f) => f.id === id) ?? null : null);
 
+  // Cotação com valor aparece em Pessoas & Custos (Orçado → Aprovado) e sai
+  // quando o pedido é recusado. A sincronia roda sobre todos os pedidos, e o
+  // store ignora o que não mudou — então rodar a cada edição é barato e não
+  // dispara o autosave do projeto à toa.
+  useEffect(() => {
+    if (carregando) return;
+    pedidos.forEach((p) => sincronizarPedido(p, friendDe(p.friendId)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, friends, carregando]);
+
   const sel = pedidos.find((p) => p.id === selId) ?? null;
   const setSel = (patch: Partial<PedidoFornecedor>) =>
     setPedidos((ps) => ps.map((p) => (p.id === selId ? { ...p, ...patch } : p)));
@@ -341,14 +352,17 @@ export function PedidosFornecedor() {
 
   const apagar = async () => {
     if (!sel) return;
-    const lancado = externos.some((e) => e.pedidoId === sel.id);
-    const aviso = lancado
-      ? `Apagar o pedido ${codigoPedido(proj, sel.numero)}? A linha de custo externo que ele gerou continua em Pessoas & Custos.`
-      : `Apagar o pedido ${codigoPedido(proj, sel.numero)}?`;
+    const linha = externos.find((e) => e.pedidoId === sel.id);
+    const aviso = !linha
+      ? `Apagar o pedido ${codigoPedido(proj, sel.numero)}?`
+      : linha.status === "Pago"
+        ? `Apagar o pedido ${codigoPedido(proj, sel.numero)}? A linha de custo já está paga e continua em Pessoas & Custos.`
+        : `Apagar o pedido ${codigoPedido(proj, sel.numero)}? A linha de ${formatBRL(linha.valor)} sai de Pessoas & Custos.`;
     if (!confirm(aviso)) return;
     try {
       await deletePedido(createClient(), sel.id);
       gravado.current.delete(sel.id);
+      soltarPedido(sel.id);
       const resto = pedidos.filter((p) => p.id !== sel.id);
       setPedidos(resto);
       setSelId(resto.at(-1)?.id ?? null);
@@ -376,7 +390,7 @@ export function PedidosFornecedor() {
       const blob = await generatePedidoBlob({ pedido: sel, proj, logoDataUrl });
       const nome = `Pedido_${codigoPedido(proj, sel.numero)}_${sel.empresa || "fornecedor"}`
         .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
+        .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^\w-]+/g, "-")
         .replace(/-+/g, "-");
       downloadBlob(blob, `${nome}.pdf`);
@@ -423,14 +437,8 @@ export function PedidosFornecedor() {
       toast.error("Preencha o valor cotado antes de aprovar.");
       return;
     }
-    const aprovado: PedidoFornecedor = {
-      ...sel,
-      status: "Aprovado",
-      respondidoEm: sel.respondidoEm || new Date().toISOString(),
-    };
-    setSel(aprovado);
-    lancarPedidoAprovado(aprovado, friendDe(sel.friendId));
-    toast.success("Aprovado — o valor entrou em Pessoas & Custos.");
+    setSel({ status: "Aprovado", respondidoEm: sel.respondidoEm || new Date().toISOString() });
+    toast.success("Aprovado — a linha em Pessoas & Custos passou para Aprovado.");
   };
 
   if (!projectId) return null;
@@ -575,26 +583,25 @@ export function PedidosFornecedor() {
                 {linhaLancada ? (
                   <div className="text-sm">
                     <div className="text-acid-dark font-medium">
-                      Em Pessoas & Custos: {linhaLancada.nome} · {formatBRL(linhaLancada.valor)}
+                      Em Pessoas & Custos: {linhaLancada.nome} · {formatBRL(linhaLancada.valor)} ·{" "}
+                      {linhaLancada.status}
                     </div>
-                    {linhaLancada.valor !== sel.valorCotado && sel.valorCotado > 0 && (
+                    {sel.status !== "Aprovado" && (
                       <button
                         onClick={aprovar}
-                        className="text-xs mt-1 px-2 py-1 rounded border border-input hover:bg-muted"
+                        className="text-sm mt-2 px-3 py-1.5 rounded-md text-neutral-900 font-medium bg-acid hover:opacity-90"
+                        title="Fecha com este fornecedor — a linha passa de Orçado para Aprovado"
                       >
-                        Atualizar custo para {formatBRL(sel.valorCotado)}
+                        Aprovar este fornecedor
                       </button>
                     )}
                   </div>
                 ) : (
-                  <button
-                    onClick={aprovar}
-                    disabled={!(sel.valorCotado > 0)}
-                    className="text-sm px-3 py-2 rounded-md text-neutral-900 font-medium bg-acid hover:opacity-90 disabled:opacity-40"
-                    title="Marca o pedido como aprovado e lança o valor como custo externo do projeto"
-                  >
-                    Aprovar e lançar custo
-                  </button>
+                  <p className="text-xs text-muted-foreground">
+                    {sel.status === "Recusado"
+                      ? "Recusado — não entra no custo do projeto."
+                      : "Preencha o valor cotado: ele entra em Pessoas & Custos como Orçado. Recusar tira a linha de lá."}
+                  </p>
                 )}
               </div>
             </div>
