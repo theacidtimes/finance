@@ -6,6 +6,8 @@ import type {
   CustoExterno,
   StaffInterno,
   MarcoCronograma,
+  CronogramaProducao,
+  TarefaCrono,
   BlocosProposta,
   OpcaoComercial,
   ProjetoArquivo,
@@ -26,6 +28,7 @@ import {
   LINHA_CUSTO_CAMBIO,
 } from "@/lib/moeda";
 import { valorDaProposta, escolherOpcao as escolher, totalSugerido } from "@/lib/opcoes";
+import { aplicarPatchTarefa, removerTarefa, moverTarefa } from "@/lib/crono";
 
 /**
  * Deriva os campos do staff de projeto a partir de um membro do cadastro.
@@ -119,6 +122,8 @@ export interface ProjetoState {
   cronograma: MarcoCronograma[];
   opcoes: OpcaoComercial[];
   blocos: BlocosProposta;
+  /** Cronograma de produção; null até alguém criar. */
+  crono: CronogramaProducao | null;
 
   setProjField: <K extends keyof Projeto>(k: K, v: Projeto[K]) => void;
 
@@ -152,7 +157,16 @@ export interface ProjetoState {
 
   setBloco: <K extends keyof BlocosProposta>(k: K, v: BlocosProposta[K]) => void;
 
-  hydrate: (data: Partial<ProjetoArquivo> & { id?: string }) => void;
+  setCrono: (c: CronogramaProducao | null) => void;
+  setCronoField: <K extends "inicio" | "pularFeriados">(k: K, v: CronogramaProducao[K]) => void;
+  addTarefa: (t: TarefaCrono, depoisDe?: string) => void;
+  updateTarefa: (id: string, patch: Partial<TarefaCrono>) => void;
+  removeTarefa: (id: string) => void;
+  moveTarefa: (id: string, delta: -1 | 1) => void;
+  /** Substitui os marcos do bloco "Cronograma" da proposta. */
+  setMarcos: (m: MarcoCronograma[]) => void;
+
+  hydrate: (data: Partial<Omit<ProjetoArquivo, "crono">> & { id?: string; crono?: CronogramaProducao | null }) => void;
   toArquivo: () => ProjetoArquivo;
 }
 
@@ -171,6 +185,7 @@ export function completoDoStore(): ProjetoCompleto {
     cronograma: s.cronograma,
     opcoes: s.opcoes,
     blocos: s.blocos,
+    crono: s.crono,
   };
 }
 
@@ -182,6 +197,7 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
   cronograma: SEED_ATTO.cronograma,
   opcoes: [],
   blocos: SEED_ATTO.blocos,
+  crono: null,
 
   setProjField: (k, v) =>
     set((s) => recalcula({ ...s.proj, [k]: v }, s.opcoes, s.externos)),
@@ -316,6 +332,33 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
 
   setBloco: (k, v) => set((s) => ({ blocos: { ...s.blocos, [k]: v } })),
 
+  setCrono: (c) => set({ crono: c }),
+  setCronoField: (k, v) => set((s) => (s.crono ? { crono: { ...s.crono, [k]: v } } : {})),
+  addTarefa: (t, depoisDe) =>
+    set((s) => {
+      if (!s.crono) return {};
+      const tarefas = [...s.crono.tarefas];
+      const i = depoisDe ? tarefas.findIndex((x) => x.id === depoisDe) : -1;
+      tarefas.splice(i >= 0 ? i + 1 : tarefas.length, 0, t);
+      return { crono: { ...s.crono, tarefas } };
+    }),
+  updateTarefa: (id, patch) =>
+    set((s) =>
+      s.crono
+        ? {
+            crono: {
+              ...s.crono,
+              tarefas: s.crono.tarefas.map((t) => (t.id === id ? aplicarPatchTarefa(t, patch) : t)),
+            },
+          }
+        : {}
+    ),
+  removeTarefa: (id) =>
+    set((s) => (s.crono ? { crono: { ...s.crono, tarefas: removerTarefa(s.crono.tarefas, id) } } : {})),
+  moveTarefa: (id, delta) =>
+    set((s) => (s.crono ? { crono: { ...s.crono, tarefas: moverTarefa(s.crono.tarefas, id, delta) } } : {})),
+  setMarcos: (m) => set({ cronograma: m }),
+
   hydrate: (data) =>
     set((s) => ({
       id: data.id ?? s.id,
@@ -325,6 +368,8 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       cronograma: Array.isArray(data.cronograma) ? data.cronograma : s.cronograma,
       opcoes: Array.isArray(data.opcoes) ? data.opcoes : [],
       blocos: data.blocos ? { ...BLOCOS_PADRAO, ...data.blocos } : s.blocos,
+      // Ausente (versão restaurada, JSON antigo) mantém o que está aberto.
+      crono: data.crono !== undefined ? data.crono : s.crono,
     })),
 
   toArquivo: () => {
@@ -339,6 +384,7 @@ export const useProjetoStore = create<ProjetoState>((set, get) => ({
       cronograma: s.cronograma,
       opcoes: s.opcoes,
       blocos: s.blocos,
+      ...(s.crono ? { crono: s.crono } : {}),
     };
   },
 }));

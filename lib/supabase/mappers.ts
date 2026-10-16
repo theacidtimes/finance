@@ -3,6 +3,7 @@ import type {
   CustoExterno,
   StaffInterno,
   MarcoCronograma,
+  CronogramaProducao,
   BlocosProposta,
   CategoriaExterna,
   StatusCustoExterno,
@@ -192,6 +193,13 @@ export function internoToStaffInsert(
     horas_projeto: s.horasProjeto,
     team_member_id: s.teamMemberId ?? null,
   };
+}
+
+/** Cronograma de produção gravado no projeto; null enquanto ninguém criou um. */
+export function cronoFromRow(row: ProjectRow): CronogramaProducao | null {
+  const c = row.crono as unknown as Partial<CronogramaProducao> | null;
+  if (!c || !Array.isArray(c.tarefas) || typeof c.inicio !== "string") return null;
+  return { inicio: c.inicio, pularFeriados: c.pularFeriados !== false, tarefas: c.tarefas };
 }
 
 export function milestoneRowToMarco(row: MilestoneRow): MarcoCronograma {

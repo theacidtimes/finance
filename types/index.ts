@@ -154,6 +154,45 @@ export interface MarcoCronograma {
   marco: string;
 }
 
+/* ================= CRONOGRAMA DE PRODUÇÃO ================= */
+
+export type StatusTarefa = "Não iniciado" | "Em andamento" | "Concluído";
+
+/**
+ * Uma linha do cronograma de produção.
+ *
+ * As datas NÃO são gravadas: saem da duração e da predecessora (ver
+ * `lib/crono.ts`). Gravar a data seria permitir que um ajuste empurre uma
+ * etapa e a seguinte continue no dia antigo — que é exatamente o erro que um
+ * cronograma encadeado existe para evitar.
+ */
+export interface TarefaCrono {
+  id: string;
+  /** "fase" agrupa as tarefas abaixo dela até a próxima fase. */
+  tipo: "fase" | "tarefa";
+  nome: string;
+  /** Dias úteis. Aceita fração: 0,5 é meio período. Ignorado em fase. */
+  duracao: number;
+  /** Id da linha que precisa terminar antes desta começar. */
+  predecessora: string | null;
+  /** "Não começa antes de" (ISO). Vale junto com a predecessora — ganha a mais tarde. */
+  inicioFixo?: string;
+  responsavel: string;
+  status: StatusTarefa;
+  /** 0–100. */
+  pct: number;
+  /** Entrega da ACID — sai em destaque. */
+  entrega?: boolean;
+}
+
+export interface CronogramaProducao {
+  /** Primeiro dia do projeto (ISO). */
+  inicio: string;
+  /** Sábado, domingo e feriado nacional não contam como dia útil. */
+  pularFeriados: boolean;
+  tarefas: TarefaCrono[];
+}
+
 /** Blocos de texto editáveis da proposta comercial */
 export interface BlocosProposta {
   /**
@@ -456,4 +495,5 @@ export interface ProjetoArquivo {
   cronograma: MarcoCronograma[];
   opcoes?: OpcaoComercial[];
   blocos: BlocosProposta;
+  crono?: CronogramaProducao;
 }

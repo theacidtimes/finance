@@ -5,6 +5,7 @@ import type {
   CustoExterno,
   StaffInterno,
   MarcoCronograma,
+  CronogramaProducao,
   OpcaoComercial,
   BlocosProposta,
   TeamMember,
@@ -33,6 +34,7 @@ import {
   staffRowToInterno,
   internoToStaffInsert,
   milestoneRowToMarco,
+  cronoFromRow,
   marcoToMilestoneInsert,
   optionRowToOpcao,
   opcaoToOptionInsert,
@@ -74,6 +76,12 @@ export interface ProjetoCompleto {
   cronograma: MarcoCronograma[];
   opcoes: OpcaoComercial[];
   blocos: BlocosProposta;
+  /**
+   * Cronograma de produção. Opcional porque não entra no histórico de versões
+   * (ver `snapshotDoProjeto`): restaurar um orçamento antigo não pode desfazer
+   * o andamento da produção. Ausente no save = coluna não é tocada.
+   */
+  crono?: CronogramaProducao | null;
 }
 
 export async function listProjects(db: DB): Promise<ProjetoResumo[]> {
@@ -146,6 +154,7 @@ export async function getProject(db: DB, id: string): Promise<ProjetoCompleto> {
     cronograma: (mile.data ?? []).map(milestoneRowToMarco),
     opcoes: (opt.data ?? []).map(optionRowToOpcao),
     blocos: blocosFromRow(row),
+    crono: cronoFromRow(row),
   };
 }
 
@@ -170,6 +179,9 @@ export async function saveProject(db: DB, state: ProjetoCompleto): Promise<void>
   const update = {
     ...projetoToProjectInsert(state.proj),
     blocos: state.blocos as unknown as Database["public"]["Tables"]["projects"]["Update"]["blocos"],
+    ...(state.crono !== undefined
+      ? { crono: state.crono as unknown as Database["public"]["Tables"]["projects"]["Update"]["crono"] }
+      : {}),
   };
   const { error } = await db.from("projects").update(update).eq("id", id);
   if (error) throw error;
