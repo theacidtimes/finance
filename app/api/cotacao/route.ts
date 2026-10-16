@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ehEquipe } from "@/lib/supabase/acesso";
 import { urlPTAX, melhorCotacao, cotavel, type BoletimPTAX } from "@/lib/cotacao";
 import { MOEDAS } from "@/lib/moeda";
 import type { MoedaProposta } from "@/types";
@@ -29,6 +30,9 @@ export async function GET(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  if (!(await ehEquipe(supabase))) {
+    return NextResponse.json({ error: "Acesso restrito à equipe." }, { status: 403 });
+  }
 
   const bruta = (new URL(req.url).searchParams.get("moeda") ?? "").toUpperCase();
   if (!(MOEDAS as readonly string[]).includes(bruta)) {

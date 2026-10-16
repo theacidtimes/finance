@@ -54,9 +54,13 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  const role: Role = body.role === "master" ? "master" : "gestor";
+  const role: Role =
+    body.role === "master" || body.role === "producao" ? body.role : "gestor";
+  // Produção não leva permissão nenhuma — o banco também ignora, mas não gravamos lixo.
   const permissions: Permissions =
-    body.permissions && typeof body.permissions === "object" ? body.permissions : {};
+    role !== "producao" && body.permissions && typeof body.permissions === "object"
+      ? body.permissions
+      : {};
 
   let admin;
   try {

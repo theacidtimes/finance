@@ -205,7 +205,7 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now(),
   email text not null default '',
   nome text not null default '',
-  role text not null default 'gestor' check (role in ('master','gestor')),
+  role text not null default 'gestor' check (role in ('master','gestor','producao')),
   permissions jsonb not null default '{}'::jsonb
 );
 
@@ -542,3 +542,137 @@ create policy "equipe le convites"    on friend_invites for select to authentica
 create policy "equipe cria convites"  on friend_invites for insert to authenticated with check (true);
 create policy "equipe edita convites" on friend_invites for update to authenticated using (true);
 create policy "equipe apaga convites" on friend_invites for delete to authenticated using (true);
+
+-- ========== PERFIL PRODUÇÃO (GP) ==========
+-- O GP monta o cronograma e não vê número nenhum: nem valor de projeto, nem
+-- custo, nem salário, nem fornecedor. Esconder a aba não basta — a anon key está
+-- no browser, então quem abre o console consulta o que o RLS deixar. Por isso:
+--
+-- 1. Toda tabela do sistema passa a exigir master ou gestor (`is_equipe`).
+--    Antes era `true` (qualquer logado). Para master/gestor nada muda.
+-- 2. O perfil `producao` não lê nenhuma tabela diretamente. Fala só com três
+--    funções que devolvem as colunas não-financeiras do projeto e gravam
+--    apenas a coluna `crono`.
+--
+-- Idempotente: pode rodar de novo.
+
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check
+  check (role in ('master','gestor','producao'));
+
+create or replace function public.is_equipe()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role in ('master','gestor'));
+$$;
+
+create or replace function public.is_usuario()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid());
+$$;
+
+-- has_perm não pode valer para produção, mesmo que alguém marque a permissão.
+create or replace function public.has_perm(perm text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+      and (role = 'master' or (role = 'gestor' and coalesce((permissions->>perm)::boolean, false)))
+  );
+$$;
+
+-- Troca `true` por `is_equipe()` nas políticas de equipe, tabela a tabela.
+do $$
+declare
+  t text;
+  tabelas text[] := array[
+    'clients','projects','external_costs','internal_staff','milestones','proposal_options',
+    'team_members','briefings','project_versions','friends','supplier_quotes','friend_invites'
+  ];
+  p record;
+begin
+  foreach t in array tabelas loop
+    for p in
+      select policyname, cmd, qual, with_check from pg_policies
+      where schemaname = 'public' and tablename = t
+    loop
+      if p.qual = 'true' then
+        execute format('alter policy %I on public.%I using (public.is_equipe())', p.policyname, t);
+      end if;
+      if p.with_check = 'true' then
+        execute format('alter policy %I on public.%I with check (public.is_equipe())', p.policyname, t);
+      end if;
+    end loop;
+  end loop;
+end $$;
+
+-- criar cliente: além da permissão, precisa ser equipe
+alter policy "equipe cria clientes" on public.clients
+  with check (public.is_equipe() and public.has_perm('criar_clientes'));
+
+-- perfis: cada um lê o próprio; a equipe lê todos (lista de usuários, autoria)
+alter policy "perfis leitura" on public.profiles
+  using (id = auth.uid() or public.is_equipe());
+
+-- arquivos (contratos do time, PDFs de pedido): só equipe
+alter policy "team-files le"    on storage.objects using (bucket_id = 'team-files' and public.is_equipe());
+alter policy "team-files cria"  on storage.objects with check (bucket_id = 'team-files' and public.is_equipe());
+alter policy "team-files edita" on storage.objects using (bucket_id = 'team-files' and public.is_equipe());
+alter policy "team-files apaga" on storage.objects using (bucket_id = 'team-files' and public.is_equipe());
+alter policy "briefings le"     on storage.objects using (bucket_id = 'briefings' and public.is_equipe());
+alter policy "briefings cria"   on storage.objects with check (bucket_id = 'briefings' and public.is_equipe());
+alter policy "briefings edita"  on storage.objects using (bucket_id = 'briefings' and public.is_equipe());
+alter policy "briefings apaga"  on storage.objects using (bucket_id = 'briefings' and public.is_equipe());
+
+-- ---------- a porta do GP ----------
+-- Lista de projetos sem nenhuma coluna de valor.
+create or replace function public.crono_projetos()
+returns table (
+  id uuid, client_id uuid, cliente text, marca text, projeto text, numero_servico text,
+  status text, updated_at timestamptz, tem_crono boolean
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_usuario() then raise exception 'sem acesso' using errcode = '42501'; end if;
+  return query
+    select p.id, p.client_id, p.cliente, coalesce(p.marca, ''), p.projeto, p.numero_servico,
+           coalesce(p.status, ''), p.updated_at, p.crono is not null
+    from public.projects p
+    order by p.updated_at desc;
+end $$;
+
+-- Um projeto: identificação + cronograma. Nada de valor, custo ou proposta.
+create or replace function public.crono_projeto(p_id uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare r jsonb;
+begin
+  if not public.is_usuario() then raise exception 'sem acesso' using errcode = '42501'; end if;
+  select jsonb_build_object(
+    'id', p.id, 'client_id', p.client_id, 'cliente', p.cliente, 'marca', coalesce(p.marca, ''),
+    'contato', coalesce(p.contato, ''), 'projeto', p.projeto, 'numero_servico', p.numero_servico,
+    'tipo', p.tipo, 'responsavel', coalesce(p.responsavel, ''), 'status', coalesce(p.status, ''),
+    'crono', p.crono
+  ) into r
+  from public.projects p where p.id = p_id;
+  return r;
+end $$;
+
+-- Grava só o cronograma.
+create or replace function public.crono_salvar(p_id uuid, p_crono jsonb)
+returns void
+language plpgsql volatile security definer set search_path = public as $$
+begin
+  if not public.is_usuario() then raise exception 'sem acesso' using errcode = '42501'; end if;
+  if p_crono is not null and jsonb_typeof(p_crono) <> 'object' then
+    raise exception 'cronograma inválido' using errcode = '22023';
+  end if;
+  update public.projects set crono = p_crono where id = p_id;
+  if not found then raise exception 'projeto não encontrado' using errcode = 'P0002'; end if;
+end $$;
+
+revoke all on function public.crono_projetos() from public, anon;
+revoke all on function public.crono_projeto(uuid) from public, anon;
+revoke all on function public.crono_salvar(uuid, jsonb) from public, anon;
+grant execute on function public.crono_projetos() to authenticated;
+grant execute on function public.crono_projeto(uuid) to authenticated;
+grant execute on function public.crono_salvar(uuid, jsonb) to authenticated;

@@ -864,7 +864,9 @@ function profileRowToPerfil(row: ProfileRow): Perfil {
     id: row.id,
     email: row.email ?? "",
     nome: row.nome ?? "",
-    role: (row.role === "master" ? "master" : "gestor") as Role,
+    // Papel desconhecido cai no MENOR acesso: tratar um "producao" como gestor
+    // mostraria telas que o banco ia recusar.
+    role: (row.role === "master" || row.role === "gestor" ? row.role : "producao") as Role,
     permissions: (row.permissions ?? {}) as Permissions,
   };
 }
@@ -902,5 +904,79 @@ export async function updateProfile(
     .from("profiles")
     .update(patch as Database["public"]["Tables"]["profiles"]["Update"])
     .eq("id", id);
+  if (error) throw error;
+}
+
+/* ================= PRODUÇÃO (GP) =================
+ * O perfil `producao` não lê tabela nenhuma: fala só com estas três funções do
+ * banco, que devolvem identificação + cronograma e gravam só o cronograma.
+ */
+
+export interface ProjetoCronoResumo {
+  id: string;
+  clientId: string | null;
+  cliente: string;
+  marca: string;
+  projeto: string;
+  numeroServico: string;
+  status: string;
+  updatedAt: string;
+  temCrono: boolean;
+}
+
+/** Projeto como o GP enxerga: sem valor, custo nem proposta. */
+export interface ProjetoCrono {
+  id: string;
+  cliente: string;
+  marca: string;
+  contato: string;
+  projeto: string;
+  numeroServico: string;
+  tipo: string;
+  responsavel: string;
+  status: string;
+  crono: CronogramaProducao | null;
+}
+
+// As funções não estão no database.types gerado; a chamada passa sem tipo.
+type RpcLivre = { rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> };
+
+export async function listProjetosCrono(db: DB): Promise<ProjetoCronoResumo[]> {
+  const { data, error } = await (db as unknown as RpcLivre).rpc("crono_projetos");
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    clientId: (r.client_id as string | null) ?? null,
+    cliente: String(r.cliente ?? ""),
+    marca: String(r.marca ?? ""),
+    projeto: String(r.projeto ?? ""),
+    numeroServico: String(r.numero_servico ?? ""),
+    status: normalizaStatusProjeto(String(r.status ?? "")),
+    updatedAt: String(r.updated_at ?? ""),
+    temCrono: Boolean(r.tem_crono),
+  }));
+}
+
+export async function getProjetoCrono(db: DB, id: string): Promise<ProjetoCrono | null> {
+  const { data, error } = await (db as unknown as RpcLivre).rpc("crono_projeto", { p_id: id });
+  if (error) throw error;
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: String(r.id),
+    cliente: String(r.cliente ?? ""),
+    marca: String(r.marca ?? ""),
+    contato: String(r.contato ?? ""),
+    projeto: String(r.projeto ?? ""),
+    numeroServico: String(r.numero_servico ?? ""),
+    tipo: String(r.tipo ?? ""),
+    responsavel: String(r.responsavel ?? ""),
+    status: String(r.status ?? ""),
+    crono: cronoFromRow({ crono: r.crono } as unknown as Parameters<typeof cronoFromRow>[0]),
+  };
+}
+
+export async function salvarCrono(db: DB, id: string, crono: CronogramaProducao | null): Promise<void> {
+  const { error } = await (db as unknown as RpcLivre).rpc("crono_salvar", { p_id: id, p_crono: crono });
   if (error) throw error;
 }

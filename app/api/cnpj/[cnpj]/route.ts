@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ehEquipe } from "@/lib/supabase/acesso";
 import { consultarReceita } from "@/lib/cnpj";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ cnpj: string }
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  if (!(await ehEquipe(supabase))) {
+    return NextResponse.json({ error: "Acesso restrito à equipe." }, { status: 403 });
+  }
 
   const { cnpj } = await ctx.params;
   const r = await consultarReceita(cnpj);

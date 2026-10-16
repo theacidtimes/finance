@@ -8,6 +8,7 @@ import {
   Handshake,
   ShieldCheck,
   TrendingUp,
+  CalendarRange,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,16 @@ const NAV: NavItem[] = [
     label: "Friends",
     icon: Handshake,
     match: (p) => p.startsWith("/friends"),
+  },
+];
+
+/** O GP só tem uma tela: a lista de projetos para montar cronograma. */
+const NAV_PRODUCAO: NavItem[] = [
+  {
+    href: "/",
+    label: "Cronogramas",
+    icon: CalendarRange,
+    match: (p) => p === "/" || p.startsWith("/projetos"),
   },
 ];
 
@@ -85,8 +96,15 @@ export function AppShell({
   userEmail: string;
 }) {
   const pathname = usePathname() ?? "/";
-  const { isMaster } = usePerfil();
-  const navItems = isMaster ? [...NAV, ...NAV_MASTER] : NAV;
+  const { isMaster, perfil, loading } = usePerfil();
+  // Enquanto o perfil carrega, menu vazio: senão o GP vê Time e Friends piscarem.
+  const navItems = loading
+    ? []
+    : perfil?.role === "producao"
+      ? NAV_PRODUCAO
+      : isMaster
+        ? [...NAV, ...NAV_MASTER]
+        : NAV;
 
   const navLink = (item: NavItem, mobile = false) => {
     const active = item.match(pathname);
