@@ -297,15 +297,26 @@ export function textoPedido(p: PedidoFornecedor, proj: Projeto): string {
 }
 
 /* ============================================================
- * Aprovação → custo externo
+ * Cotação → custo externo
  * ========================================================== */
 
 /**
- * A linha de custo externo que um pedido aprovado vira.
+ * O pedido tem que aparecer em Pessoas & Custos? Só quando há um valor e o
+ * fornecedor não foi recusado. Recusar é como se tira do DRE a cotação que
+ * perdeu — sem isso, cotar o mesmo serviço com três fornecedores somaria os
+ * três no custo do projeto.
+ */
+export function pedidoNoCusto(p: Pick<PedidoFornecedor, "valorCotado" | "status">): boolean {
+  return p.valorCotado > 0 && p.status !== "Recusado";
+}
+
+/**
+ * A linha de custo externo que uma cotação vira: "Orçado" enquanto o pedido
+ * não é aprovado, "Aprovado" depois.
  *
- * Com `existente`, atualiza a linha já lançada em vez de criar outra: aprovar
- * duas vezes (ou corrigir o valor depois) não pode duplicar o custo no DRE.
- * O que a equipe mudou à mão na linha (NF, data de pagamento, obs) fica.
+ * Com `existente`, atualiza a linha já lançada em vez de criar outra: mudar o
+ * valor ou aprovar não pode duplicar o custo no DRE. O que a equipe mudou à
+ * mão na linha (categoria, função, NF, data de pagamento, obs) fica.
  */
 export function externoDoPedido(
   p: PedidoFornecedor,
@@ -319,7 +330,7 @@ export function externoDoPedido(
     funcao: "",
     categoria,
     valor: 0,
-    status: "Aprovado",
+    status: "Orçado",
     nf: false,
     dataPagamento: "",
     obs: "",
@@ -331,8 +342,8 @@ export function externoDoPedido(
     funcao: base.funcao || (categoria === "Outros" ? "" : categoria),
     categoria: existente ? base.categoria : categoria,
     valor: p.valorCotado,
-    // Pago continua pago: reaprovar um valor não desfaz um pagamento.
-    status: base.status === "Pago" ? "Pago" : "Aprovado",
+    // Pago continua pago: mexer no pedido não desfaz um pagamento.
+    status: base.status === "Pago" ? "Pago" : p.status === "Aprovado" ? "Aprovado" : "Orçado",
     friendId: p.friendId ?? base.friendId ?? null,
     pedidoId: p.id,
   };
