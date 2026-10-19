@@ -10,8 +10,10 @@ import {
   coresPorResponsavel,
   cronoVazio,
   dataCurta,
+  diaMes,
   diasEntre,
-  ehDiaUtil,
+  diaUtilNoCrono,
+  feriadosNoPeriodo,
   formatDuracao,
   marcosParaProposta,
   modeloProducaoIA,
@@ -84,8 +86,12 @@ function ImportarPdf({ variante = "secundario" }: { variante?: "primario" | "sec
         return;
       }
       setCrono(lido);
+      const trabalhados = lido.feriadosTrabalhados ?? [];
       toast.success(
         `Cronograma importado: ${resumo}.` +
+          (trabalhados.length
+            ? ` Feriado trabalhado no arquivo: ${trabalhados.map(diaMes).join(", ")}.`
+            : "") +
           (fixadas ? ` ${fixadas} data(s) de início fixada(s) para bater com o arquivo (em amarelo).` : "")
       );
     } catch (e) {
@@ -186,7 +192,7 @@ function LinhaDoTempo({
   const Fundo = () => (
     <>
       {dias.map((d, i) =>
-        ehDiaUtil(d, crono.pularFeriados) ? null : (
+        diaUtilNoCrono(d, crono) ? null : (
           <div key={d} className="absolute inset-y-0 bg-muted" style={{ left: pct(i), width: pct(1) }} />
         )
       )}
@@ -211,7 +217,7 @@ function LinhaDoTempo({
                   className={cn(
                     "absolute top-0 tabular-nums",
                     porDia && "text-center",
-                    !ehDiaUtil(d, crono.pularFeriados) && "opacity-40"
+                    !diaUtilNoCrono(d, crono) && "opacity-40"
                   )}
                   style={{ left: pct(i), width: porDia ? pct(1) : undefined }}
                 >
@@ -336,6 +342,17 @@ export function Cronograma({ comProposta = true }: { comProposta?: boolean } = {
 
   const comCiclo = calc.linhas.some((l) => l.ciclo);
 
+  // Feriados dentro do cronograma — com folga de duas semanas no fim, porque
+  // pular um feriado estica o projeto e pode empurrá-lo para cima do próximo.
+  const feriadosDoPeriodo = feriadosNoPeriodo(crono.inicio, somaDias(calc.projeto.fim, 14));
+  const alternarFeriado = (f: string) => {
+    const atuais = crono.feriadosTrabalhados ?? [];
+    setCronoField(
+      "feriadosTrabalhados",
+      atuais.includes(f) ? atuais.filter((x) => x !== f) : [...atuais, f].sort()
+    );
+  };
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -393,6 +410,29 @@ export function Cronograma({ comProposta = true }: { comProposta?: boolean } = {
             />
             Pular feriados nacionais (e Carnaval / Corpus Christi)
           </label>
+          {crono.pularFeriados && feriadosDoPeriodo.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pb-1">
+              <span className="text-[11px] text-muted-foreground">Feriados no período:</span>
+              {feriadosDoPeriodo.map((f) => {
+                const trabalhado = (crono.feriadosTrabalhados ?? []).includes(f);
+                return (
+                  <button
+                    key={f}
+                    onClick={() => alternarFeriado(f)}
+                    title={trabalhado ? "Trabalhamos neste feriado — clique para pular" : "Pulado — clique se a equipe vai trabalhar"}
+                    className={cn(
+                      "text-[11px] px-2 py-0.5 rounded-full border tabular-nums",
+                      trabalhado
+                        ? "border-acid/40 bg-acid/15 text-acid-dark"
+                        : "border-border bg-muted text-muted-foreground line-through"
+                    )}
+                  >
+                    {diaMes(f)} {trabalhado ? "· trabalhado" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">

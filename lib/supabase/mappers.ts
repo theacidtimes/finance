@@ -199,7 +199,14 @@ export function internoToStaffInsert(
 export function cronoFromRow(row: ProjectRow): CronogramaProducao | null {
   const c = row.crono as unknown as Partial<CronogramaProducao> | null;
   if (!c || !Array.isArray(c.tarefas) || typeof c.inicio !== "string") return null;
-  return { inicio: c.inicio, pularFeriados: c.pularFeriados !== false, tarefas: c.tarefas };
+  return {
+    inicio: c.inicio,
+    pularFeriados: c.pularFeriados !== false,
+    ...(Array.isArray(c.feriadosTrabalhados) && c.feriadosTrabalhados.length
+      ? { feriadosTrabalhados: c.feriadosTrabalhados.filter((x) => typeof x === "string") }
+      : {}),
+    tarefas: c.tarefas,
+  };
 }
 
 export function milestoneRowToMarco(row: MilestoneRow): MarcoCronograma {

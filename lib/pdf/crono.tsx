@@ -7,7 +7,7 @@ import {
   dataCurta,
   diaMes,
   diasEntre,
-  ehDiaUtil,
+  diaUtilNoCrono,
   formatDuracao,
   somaDias,
   type LinhaCrono,
@@ -113,7 +113,7 @@ export function CronoDoc({ proj, crono, logoDataUrl }: CronoPdfData) {
   const Folgas = () => (
     <>
       {dias.map((d, i) =>
-        ehDiaUtil(d, crono.pularFeriados) ? null : (
+        diaUtilNoCrono(d, crono) ? null : (
           <View
             key={d}
             style={{ position: "absolute", top: 0, bottom: 0, left: i * px, width: px, backgroundColor: "#F1F1F1" }}
@@ -175,7 +175,7 @@ export function CronoDoc({ proj, crono, logoDataUrl }: CronoPdfData) {
                     width: porDia ? px : 30,
                     fontSize: 5.5,
                     textAlign: porDia ? "center" : "left",
-                    color: ehDiaUtil(d, crono.pularFeriados) ? INK : "#9CA3AF",
+                    color: diaUtilNoCrono(d, crono) ? INK : "#9CA3AF",
                   }}
                 >
                   {porDia ? d.slice(8) : diaMes(d)}

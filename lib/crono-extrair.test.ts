@@ -73,3 +73,51 @@ describe("importar cronograma lido do PDF", () => {
     expect(normalizarCronoExtraido(null)).toBeNull();
   });
 });
+
+/** Smartsheet do GP: Droga5 + Santander - AI Video - Simulador DU (out/2026). */
+const simulador = [
+  [2, "fase", "Setup", 8, "2026-10-09", "2026-10-21", null, "", "Não iniciado", 69],
+  [3, "tarefa", "Briefing", 1, "2026-10-09", "2026-10-09", null, "Droga5", "Concluído", 100],
+  [4, "tarefa", "Análise + Confecção de Proposta Comercial", 2, "2026-10-13", "2026-10-14", 3, "The Acid Times", "Concluído", 100],
+  [5, "tarefa", "Validação/Aprovação", 2.5, "2026-10-15", "2026-10-19", 4, "Droga5", "Concluído", 100],
+  [6, "tarefa", "Kickoff", 0.5, "2026-10-19", "2026-10-19", 5, "The Acid Times", "Em andamento", 0],
+  [7, "tarefa", "Envio de assets", 2, "2026-10-20", "2026-10-21", 6, "Droga5", "Em andamento", 0],
+  [8, "fase", "Criação/Produção AI", 17, "2026-10-20", "2026-11-11", null, "", "Não iniciado", 0],
+  [9, "tarefa", "Produção de stills", 3, "2026-10-20", "2026-10-22", 6, "The Acid Times", "Não iniciado", 0],
+  [10, "tarefa", "Validação", 0.5, "2026-10-23", "2026-10-23", 9, "Droga5", "Não iniciado", 0],
+  [11, "tarefa", "Ajustes", 1, "2026-10-23", "2026-10-26", 10, "The Acid Times", "Não iniciado", 0],
+  [12, "tarefa", "Validação", 0.5, "2026-10-26", "2026-10-26", 11, "Santander + Droga5", "Não iniciado", 0],
+  [13, "tarefa", "Ajustes finais", 1, "2026-10-27", "2026-10-27", 12, "The Acid Times", "Não iniciado", 0],
+  [14, "tarefa", "Aprovação", 0.5, "2026-10-28", "2026-10-28", 13, "Santander + Droga5", "Não iniciado", 0],
+  [15, "tarefa", "Motion AI + Edit", 4, "2026-10-28", "2026-11-03", 14, "The Acid Times", "Não iniciado", 0],
+  [16, "tarefa", "Validação", 0.5, "2026-11-03", "2026-11-03", 15, "Droga5", "Não iniciado", 0],
+  [17, "tarefa", "Ajustes", 1, "2026-11-04", "2026-11-04", 16, "The Acid Times", "Não iniciado", 0],
+  [18, "tarefa", "Validação", 0.5, "2026-11-05", "2026-11-05", 17, "Santander + Droga5", "Não iniciado", 0],
+  [19, "tarefa", "Ajustes finais", 1, "2026-11-05", "2026-11-06", 18, "The Acid Times", "Não iniciado", 0],
+  [20, "tarefa", "Aprovação", 0.5, "2026-11-06", "2026-11-06", 19, "Santander + Droga5", "Não iniciado", 0],
+  [21, "tarefa", "Finalização", 1, "2026-11-09", "2026-11-09", 20, "The Acid Times", "Não iniciado", 0],
+  [22, "tarefa", "Validação", 0.5, "2026-11-10", "2026-11-10", 21, "Droga5", "Não iniciado", 0],
+  [23, "tarefa", "Ajustes", 1, "2026-11-10", "2026-11-11", 22, "The Acid Times", "Não iniciado", 0],
+  [24, "tarefa", "Export/Entrega final", 0.5, "2026-11-11", "2026-11-11", 23, "The Acid Times", "Não iniciado", 0],
+];
+
+describe("importar o Simulador DU (pula 12/10, trabalha 02/11)", () => {
+  const r = normalizarCronoExtraido({
+    tarefas: simulador.map(([linha, tipo, nome, duracao, inicio, fim, predecessora, responsavel, status, pct]) => ({
+      linha, tipo, nome, duracao, inicio, fim, predecessora, responsavel, status, pct,
+    })),
+  })!;
+  const { linhas, projeto } = calcularCrono(r.crono);
+
+  it("descobre que Finados foi trabalhado e o 12/10 não", () => {
+    expect(r.crono.feriadosTrabalhados).toEqual(["2026-11-02"]);
+    expect(r.fixadas).toBe(0);
+  });
+
+  it("todas as datas batem com o Smartsheet", () => {
+    expect(linhas.map((l) => [l.numero, l.inicio, l.fim])).toEqual(
+      simulador.map((s) => [s[0], s[4], s[5]])
+    );
+    expect(projeto.duracao).toBe(23);
+  });
+});

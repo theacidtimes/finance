@@ -190,6 +190,11 @@ export interface CronogramaProducao {
   inicio: string;
   /** Sábado, domingo e feriado nacional não contam como dia útil. */
   pularFeriados: boolean;
+  /**
+   * Feriados em que a produção trabalha (ISO). Exceção por dia à regra acima:
+   * é comum pular o 12/10 e trabalhar no 02/11 no mesmo projeto.
+   */
+  feriadosTrabalhados?: string[];
   tarefas: TarefaCrono[];
 }
 

@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { CronogramaProducao, StatusTarefa, TarefaCrono } from "@/types";
-import { calcularCrono, novoIdTarefa, STATUS_TAREFA } from "@/lib/crono";
+import { calcularCrono, feriadosNoPeriodo, novoIdTarefa, STATUS_TAREFA } from "@/lib/crono";
 
 /**
  * Leitura de um cronograma em PDF (ou print) via Claude.
@@ -10,6 +10,10 @@ import { calcularCrono, novoIdTarefa, STATUS_TAREFA } from "@/lib/crono";
  * predecessora, e onde a conta do app daria um início ANTES do que o documento
  * diz, fixa o "não antes de" com a data do documento. Assim o cronograma
  * importado bate com o PDF e continua encadeado para os próximos ajustes.
+ *
+ * Feriado é decidido um a um, pelas datas do documento: o Smartsheet do GP
+ * pula o 12/10 e trabalha no 02/11 no mesmo cronograma. Uma regra única
+ * ("pula todos") desalinhava tudo depois de Finados.
  */
 
 export { MODELO } from "@/lib/pedido/extrair";
@@ -67,6 +71,9 @@ export interface ResultadoImportacao {
   fixadas: number;
 }
 
+/** Acima disso, combinações demais; feriados além do 8º seguem a regra padrão (pular). */
+const MAX_FERIADOS_TESTADOS = 8;
+
 /** Converte a saída da ferramenta num cronograma do app. Null se não houver tarefa. */
 export function normalizarCronoExtraido(raw: unknown): ResultadoImportacao | null {
   const o = (raw ?? {}) as Record<string, unknown>;
@@ -81,6 +88,7 @@ export function normalizarCronoExtraido(raw: unknown): ResultadoImportacao | nul
       nome: str(l.nome),
       duracao: Math.max(0, num(l.duracao)),
       inicio: ISO.test(str(l.inicio)) ? str(l.inicio) : "",
+      fim: ISO.test(str(l.fim)) ? str(l.fim) : "",
       predecessora: l.predecessora == null ? null : num(l.predecessora),
       responsavel: str(l.responsavel),
       status: (STATUS_TAREFA as string[]).includes(str(l.status))
@@ -112,18 +120,40 @@ export function normalizarCronoExtraido(raw: unknown): ResultadoImportacao | nul
 
   const crono: CronogramaProducao = { inicio, pularFeriados: true, tarefas };
 
+  // Quais feriados o documento trabalha: a combinação que mais acerta as datas
+  // dele. Empate fica com a que trabalha menos feriados (o padrão é pular).
+  const doc = new Map(lidas.map((l) => [l.id, l]));
+  const ultimaData = [...datas, ...lidas.map((l) => l.fim).filter(Boolean)].sort().pop() ?? inicio;
+  const candidatos = feriadosNoPeriodo(inicio, ultimaData).slice(0, MAX_FERIADOS_TESTADOS);
+  const erros = () =>
+    calcularCrono(crono).linhas.reduce((n, c) => {
+      const d = doc.get(c.tarefa.id);
+      if (!d || c.tarefa.tipo !== "tarefa") return n;
+      return n + (d.inicio && d.inicio !== c.inicio ? 1 : 0) + (d.fim && d.fim !== c.fim ? 1 : 0);
+    }, 0);
+  let melhor = { erros: Infinity, trabalhados: [] as string[] };
+  for (let mask = 0; mask < 1 << candidatos.length; mask++) {
+    const trabalhados = candidatos.filter((_, i) => mask & (1 << i));
+    crono.feriadosTrabalhados = trabalhados;
+    const e = erros();
+    if (e < melhor.erros || (e === melhor.erros && trabalhados.length < melhor.trabalhados.length)) {
+      melhor = { erros: e, trabalhados };
+    }
+  }
+  if (melhor.trabalhados.length) crono.feriadosTrabalhados = melhor.trabalhados;
+  else delete crono.feriadosTrabalhados;
+
   // Onde a conta adianta a tarefa em relação ao documento, fixa a data dele.
   // Uma por vez, em ordem: fixar uma empurra as seguintes, que podem deixar de precisar.
-  const doc = new Map(lidas.map((l) => [l.id, l.inicio]));
   let fixadas = 0;
   for (let guarda = 0; guarda < tarefas.length; guarda++) {
     const { linhas: calc } = calcularCrono(crono);
     const adiantada = calc.find((c) => {
-      const d = doc.get(c.tarefa.id);
+      const d = doc.get(c.tarefa.id)?.inicio;
       return c.tarefa.tipo === "tarefa" && d && c.inicio < d && !c.tarefa.inicioFixo;
     });
     if (!adiantada) break;
-    adiantada.tarefa.inicioFixo = doc.get(adiantada.tarefa.id);
+    adiantada.tarefa.inicioFixo = doc.get(adiantada.tarefa.id)!.inicio;
     fixadas++;
   }
   return { crono, fixadas };
