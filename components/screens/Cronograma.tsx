@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, FileDown, Plus, Star, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileDown, FileUp, Plus, Star, X } from "lucide-react";
 import { Section, KPI, NumInput, TextInput, Select } from "@/components/ui/primitives";
 import { useProjetoStore } from "@/lib/store";
 import {
@@ -35,7 +35,98 @@ const hojeISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** Primeiro uso: modelo pronto ou tabela em branco. */
+/** Lê um File como base64 puro (sem o prefixo data:...;base64,). */
+function fileParaBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = String(reader.result);
+      const comma = res.indexOf(",");
+      resolve(comma >= 0 ? res.slice(comma + 1) : res);
+    };
+    reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Limite abaixo do corpo máximo da Vercel (4,5 MB) depois do base64 (+33%). */
+const MAX_ARQUIVO = 3 * 1024 * 1024;
+
+/**
+ * Importa um cronograma em PDF ou print. A IA transcreve a tabela; a tela
+ * confirma antes de trocar o que já existe — importar é substituir, não mesclar.
+ */
+function ImportarPdf({ variante = "secundario" }: { variante?: "primario" | "secundario" }) {
+  const crono = useProjetoStore((s) => s.crono);
+  const setCrono = useProjetoStore((s) => s.setCrono);
+  const input = useRef<HTMLInputElement>(null);
+  const [lendo, setLendo] = useState(false);
+
+  const importar = async (file: File) => {
+    if (file.size > MAX_ARQUIVO) {
+      toast.error("Arquivo acima de 3 MB. Exporte o PDF só com a tabela ou mande um print.");
+      return;
+    }
+    setLendo(true);
+    try {
+      const res = await fetch("/api/crono/extrair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arquivoBase64: await fileParaBase64(file), tipo: file.type }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Falha ao ler o cronograma.");
+      const { crono: lido, fixadas } = json as { crono: CronogramaProducao; fixadas: number };
+      const { projeto } = calcularCrono(lido);
+      const n = lido.tarefas.length;
+      const resumo = `${n} linhas, de ${dataCurta(projeto.inicio)} a ${dataCurta(projeto.fim)}`;
+      if (crono?.tarefas.length && !window.confirm(`Substituir o cronograma atual pelo do arquivo (${resumo})?`)) {
+        return;
+      }
+      setCrono(lido);
+      toast.success(
+        `Cronograma importado: ${resumo}.` +
+          (fixadas ? ` ${fixadas} data(s) de início fixada(s) para bater com o arquivo (em amarelo).` : "")
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao ler o cronograma.");
+    } finally {
+      setLendo(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept="application/pdf,image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) importar(f);
+        }}
+      />
+      <button
+        onClick={() => input.current?.click()}
+        disabled={lendo}
+        title="Lê um cronograma em PDF ou print (Smartsheet, planilha, Gantt) e monta a tabela"
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-md disabled:opacity-50",
+          variante === "primario"
+            ? "text-sm px-4 py-2 border border-input hover:bg-muted"
+            : "text-xs px-3 py-1.5 border border-input hover:bg-muted"
+        )}
+      >
+        <FileUp className={variante === "primario" ? "h-4 w-4" : "h-3.5 w-3.5"} />
+        {lendo ? "Lendo o arquivo…" : "Importar PDF"}
+      </button>
+    </>
+  );
+}
+
+/** Primeiro uso: modelo pronto, arquivo ou tabela em branco. */
 function Vazio() {
   const proj = useProjetoStore((s) => s.proj);
   const setCrono = useProjetoStore((s) => s.setCrono);
@@ -62,6 +153,7 @@ function Vazio() {
           >
             Começar em branco
           </button>
+          <ImportarPdf variante="primario" />
         </div>
         <p className="text-[11px] text-muted-foreground/70 mt-3">
           O modelo traz setup, stills, motion e finalização com duas rodadas de validação, já com{" "}
@@ -261,6 +353,7 @@ export function Cronograma({ comProposta = true }: { comProposta?: boolean } = {
         title="Cronograma de produção"
         right={
           <div className="flex flex-wrap items-center gap-2">
+            <ImportarPdf />
             {comProposta && (
               <button
                 onClick={levarParaProposta}
