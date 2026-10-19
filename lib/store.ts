@@ -158,7 +158,10 @@ export interface ProjetoState {
   setBloco: <K extends keyof BlocosProposta>(k: K, v: BlocosProposta[K]) => void;
 
   setCrono: (c: CronogramaProducao | null) => void;
-  setCronoField: <K extends "inicio" | "pularFeriados">(k: K, v: CronogramaProducao[K]) => void;
+  setCronoField: <K extends "inicio" | "pularFeriados" | "feriadosTrabalhados">(
+    k: K,
+    v: CronogramaProducao[K]
+  ) => void;
   addTarefa: (t: TarefaCrono, depoisDe?: string) => void;
   updateTarefa: (id: string, patch: Partial<TarefaCrono>) => void;
   removeTarefa: (id: string) => void;

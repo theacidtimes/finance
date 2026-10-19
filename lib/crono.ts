@@ -79,38 +79,71 @@ export function feriados(ano: number): Set<string> {
   return set;
 }
 
-export function ehDiaUtil(iso: string, pularFeriados: boolean): boolean {
+/** Dia útil do ponto de vista do cronograma: fim de semana nunca; feriado, depende. */
+export function ehDiaUtil(
+  iso: string,
+  pularFeriados: boolean,
+  trabalhados: readonly string[] = []
+): boolean {
   const d = parseISO(iso);
   const sem = d.getUTCDay();
   if (sem === 0 || sem === 6) return false;
-  return !(pularFeriados && feriados(d.getUTCFullYear()).has(toISO(d)));
+  const dia = toISO(d);
+  return !(pularFeriados && feriados(d.getUTCFullYear()).has(dia) && !trabalhados.includes(dia));
+}
+
+/** Atalho com a regra do próprio cronograma. */
+export function diaUtilNoCrono(iso: string, crono: CronogramaProducao): boolean {
+  return ehDiaUtil(iso, crono.pularFeriados, crono.feriadosTrabalhados);
 }
 
 /** O próprio dia, se for útil; senão o próximo útil. */
-export function proximoDiaUtil(iso: string, pularFeriados: boolean): string {
+export function proximoDiaUtil(
+  iso: string,
+  pularFeriados: boolean,
+  trabalhados: readonly string[] = []
+): string {
   let d = iso.slice(0, 10);
-  for (let i = 0; i < 30 && !ehDiaUtil(d, pularFeriados); i++) d = somaDias(d, 1);
+  for (let i = 0; i < 30 && !ehDiaUtil(d, pularFeriados, trabalhados); i++) d = somaDias(d, 1);
   return d;
+}
+
+/** Feriados que caem em dia de semana entre duas datas — os únicos que mudam a conta. */
+export function feriadosNoPeriodo(inicio: string, fim: string): string[] {
+  const out: string[] = [];
+  const ini = parseISO(inicio).getUTCFullYear();
+  const ate = parseISO(fim).getUTCFullYear();
+  for (let ano = ini; ano <= ate; ano++) {
+    for (const f of feriados(ano)) {
+      const sem = parseISO(f).getUTCDay();
+      if (f >= inicio.slice(0, 10) && f <= fim.slice(0, 10) && sem !== 0 && sem !== 6) out.push(f);
+    }
+  }
+  return out.sort();
 }
 
 /** Calendário de um cronograma: índice de dia útil ↔ data. */
 class Calendario {
   private dias: string[];
-  constructor(inicio: string, private pularFeriados: boolean) {
-    this.dias = [proximoDiaUtil(inicio, pularFeriados)];
+  constructor(
+    inicio: string,
+    private pularFeriados: boolean,
+    private trabalhados: readonly string[] = []
+  ) {
+    this.dias = [proximoDiaUtil(inicio, pularFeriados, trabalhados)];
   }
   /** Data do n-ésimo dia útil (0 = primeiro dia do projeto). */
   dia(n: number): string {
     const i = Math.max(0, Math.floor(n));
     while (this.dias.length <= i) {
       const ultimo = this.dias[this.dias.length - 1];
-      this.dias.push(proximoDiaUtil(somaDias(ultimo, 1), this.pularFeriados));
+      this.dias.push(proximoDiaUtil(somaDias(ultimo, 1), this.pularFeriados, this.trabalhados));
     }
     return this.dias[i];
   }
   /** Índice do dia útil em que cai a data (fim de semana conta como o próximo útil). */
   indice(iso: string): number {
-    const alvo = proximoDiaUtil(iso, this.pularFeriados);
+    const alvo = proximoDiaUtil(iso, this.pularFeriados, this.trabalhados);
     if (alvo <= this.dias[0]) return 0;
     let n = 0;
     while (this.dia(n) < alvo && n < 5000) n++;
@@ -161,7 +194,7 @@ function pctPonderado(tarefas: TarefaCrono[]): number {
 }
 
 export function calcularCrono(crono: CronogramaProducao): CronoCalculado {
-  const cal = new Calendario(crono.inicio, crono.pularFeriados);
+  const cal = new Calendario(crono.inicio, crono.pularFeriados, crono.feriadosTrabalhados);
   const tarefas = crono.tarefas;
   const porId = new Map(tarefas.map((t) => [t.id, t]));
 
