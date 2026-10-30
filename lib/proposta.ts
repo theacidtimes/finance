@@ -52,10 +52,26 @@ const META_ROTULOS: Record<IdiomaProposta, Record<string, string>> = {
   },
 };
 
+/**
+ * Data de emissão no formato do documento: 08/10/2026 em português (mesmo
+ * dd/mm do cronograma) e "8 Oct 2026" em inglês, onde dd/mm e mm/dd confundem.
+ * O campo guarda ISO (aaaa-mm-dd); texto livre passa direto.
+ */
+export function dataProposta(iso: string, idioma: IdiomaProposta): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso?.trim() ?? "");
+  if (!m) return iso;
+  const [, a, mes, d] = m;
+  if (idioma === "en") {
+    const meses = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${Number(d)} ${meses[Number(mes) - 1]} ${a}`;
+  }
+  return `${d}/${mes}/${a}`;
+}
+
 export function metaProposta(proj: Projeto): MetaProposta[] {
   const R = META_ROTULOS[idiomaDe(proj)];
   const itens: MetaProposta[] = [
-    { rotulo: R.data, valor: proj.data },
+    { rotulo: R.data, valor: dataProposta(proj.data, idiomaDe(proj)) },
     { rotulo: R.cliente, valor: proj.cliente },
   ];
 

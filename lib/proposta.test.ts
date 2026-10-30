@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   metaProposta,
+  dataProposta,
   destinatario,
   linhaProjeto,
   blocosProposta,
@@ -29,6 +30,12 @@ const valor = (p: Projeto, rotulo: string) =>
   metaProposta(p).find((m) => m.rotulo === rotulo)?.valor;
 
 describe("cabeçalho da proposta", () => {
+  it("data no padrão dd/mm/aaaa, igual ao cronograma", () => {
+    expect(valor(proj(), "Data")).toBe("03/08/2026");
+    expect(dataProposta("2026-10-08", "en")).toBe("8 Oct 2026");
+    expect(dataProposta("a combinar", "pt")).toBe("a combinar");
+  });
+
   it("sem marca nem contato, mostra só o essencial", () => {
     expect(rotulos(proj())).toEqual(["Data", "Cliente", "Projeto", "Validade"]);
   });
