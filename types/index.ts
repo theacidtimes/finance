@@ -213,6 +213,15 @@ export interface BlocosProposta {
   projeto: string;
   servicoInclui: string;
   entrega: string;
+  /**
+   * Bloco "Custos de terceiros" — ficha "Rótulo: valor" com o que o cliente
+   * paga direto a outro fornecedor (trilha, Condecine, locução).
+   *
+   * Não é "Não está incluso": esses custos fazem parte do projeto, só não
+   * passam pela nota da ACID. Por isso também ficam fora do `valorBruto`, do
+   * DRE e da margem — se entrassem, pagariam imposto e comissão por nada.
+   */
+  terceiros: string;
   exclusoes: string;
   alteracoes: string;
   observacoes: string;

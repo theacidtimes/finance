@@ -22,6 +22,7 @@ export const BLOCOS_PADRAO: BlocosProposta = {
 - Correção de cor
 - Masterização e entregas finais`,
   entrega: `1 filme hero 30" — entrega online 16:9 + demais formatos conforme cronograma.`,
+  terceiros: ``,
   exclusoes: `- Arquivo aberto para edição
 - Gravação e captação Live Action
 - Trilhas compostas e sound effects

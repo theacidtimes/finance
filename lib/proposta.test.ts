@@ -142,6 +142,7 @@ describe("blocos da proposta: vazio não ocupa página", () => {
       projeto: "",
       servicoInclui: "",
       entrega: "",
+      terceiros: "",
       exclusoes: "",
       alteracoes: "",
       observacoes: "",
@@ -157,6 +158,17 @@ describe("blocos da proposta: vazio não ocupa página", () => {
       "5. Materiais de apoio",
       "6. Validade",
     ]);
+  });
+
+  it("custos de terceiros entram logo depois do investimento, só quando preenchidos", () => {
+    expect(numero("terceiros", blocosDe(), crono)).toBe("");
+    const b = blocosProposta(
+      proj(),
+      blocosDe({ terceiros: "Trilha: R$ 10.000 · Big Sur Sounds" }),
+      crono
+    );
+    expect(b.terceiros.incluso).toBe(true);
+    expect(Number(b.terceiros.n)).toBe(Number(b.investimento.n) + 1);
   });
 
   it("condição de pagamento em branco sai da proposta", () => {
