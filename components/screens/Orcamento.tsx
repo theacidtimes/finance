@@ -16,6 +16,7 @@ import {
   blocosProposta,
   parseFicha,
   rotulosFicha,
+  rotulosTerceiros,
   textosProposta,
   textoProjeto,
   type BlocoProposta,
@@ -605,6 +606,21 @@ export function Orcamento() {
               <b>{formatMoeda(valorDaProposta(opcoes, valorProposta(proj)), moeda, { idioma })}</b>
               {opcoes.some((o) => o.escolhida) ? " (condição fechada)." : " — a menor condição."}
             </p>
+          )}
+        </Bloco>
+
+        <Bloco b={B.terceiros} editando={editando}>
+          <p className="text-xs text-muted-foreground mb-2">{T.terceirosNota}</p>
+          {editando ? (
+            <FichaEditor
+              value={blocos.terceiros}
+              onChange={(v) => setBloco("terceiros", v)}
+              rotulos={rotulosTerceiros(idioma)}
+              listId="rotulos-terceiros"
+              ajuda="Valores pagos direto ao fornecedor. Não entram no investimento, no DRE nem na margem."
+            />
+          ) : (
+            <Ficha texto={blocos.terceiros} />
           )}
         </Bloco>
 

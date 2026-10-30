@@ -264,6 +264,11 @@ export function PropostaDoc({ proj, blocos, cronograma, opcoes, logoDataUrl }: P
           <Text style={s.investNote}>{T.investimentoNota}</Text>
         </Block>
 
+        <Block b={B.terceiros}>
+          <Text style={s.investNote}>{T.terceirosNota}</Text>
+          <Ficha texto={blocos.terceiros} />
+        </Block>
+
         <Block b={B.pagamento}>
           <Text style={s.body}>{proj.condicaoPagamento}</Text>
         </Block>

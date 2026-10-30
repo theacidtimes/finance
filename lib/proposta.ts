@@ -243,6 +243,13 @@ export const ROTULOS_FICHA_EN = [
   "Audio deliverables",
 ];
 
+/** Sugestões de rótulo para "Custos de terceiros" — os repasses mais comuns. */
+export function rotulosTerceiros(idioma: IdiomaProposta): string[] {
+  return idioma === "en"
+    ? ["Music", "Voice-over", "Condecine and Ancine registration", "Talent", "Media"]
+    : ["Trilha", "Locução", "Condecine e registro Ancine", "Elenco", "Mídia"];
+}
+
 export function rotulosFicha(idioma: IdiomaProposta): string[] {
   return idioma === "en" ? ROTULOS_FICHA_EN : ROTULOS_FICHA;
 }
@@ -256,6 +263,7 @@ export type ChaveBloco =
   | "servicoInclui"
   | "entrega"
   | "investimento"
+  | "terceiros"
   | "pagamento"
   | "cronograma"
   | "exclusoes"
@@ -291,6 +299,7 @@ const ORDEM: { chave: ChaveBloco; titulo: Titulo; sempre?: true; miudo?: true }[
   { chave: "servicoInclui", titulo: { pt: "O serviço inclui", en: "The service includes" } },
   { chave: "entrega", titulo: { pt: "Especificação da entrega", en: "Deliverables" } },
   { chave: "investimento", titulo: { pt: "Investimento", en: "Investment" }, sempre: true },
+  { chave: "terceiros", titulo: { pt: "Custos de terceiros", en: "Third-party costs" } },
   { chave: "pagamento", titulo: { pt: "Condições de pagamento", en: "Payment terms" } },
   { chave: "cronograma", titulo: { pt: "Cronograma", en: "Schedule" } },
   { chave: "exclusoes", titulo: { pt: "Não está incluso", en: "Not included" } },
@@ -348,6 +357,7 @@ export function blocosProposta(
     // A entrega é uma ficha: só linha em branco ou "\n" solto não é conteúdo.
     entrega: fichaVisivel(blocos.entrega),
     investimento: true,
+    terceiros: fichaVisivel(blocos.terceiros),
     pagamento: cheio(proj.condicaoPagamento),
     // Marco em branco (linha adicionada e não preenchida) não conta como
     // cronograma — senão o bloco entra vazio, que é o que queremos evitar.
@@ -411,6 +421,8 @@ export function textoProjeto(proj: Projeto, blocos: BlocosProposta): string {
 export interface TextosProposta {
   investimentoLabel: string;
   investimentoNota: string;
+  /** Abre o bloco "Custos de terceiros": deixa claro que não somam ao investimento. */
+  terceirosNota: string;
   validade: string;
   roteiroLabel: string;
 }
@@ -436,6 +448,8 @@ export function textosProposta(proj: Projeto): TextosProposta {
     return {
       investimentoLabel: "Total project investment",
       investimentoNota: nota,
+      terceirosNota:
+        "Invoiced separately and paid directly to each supplier. Not included in the investment above.",
       validade: `This proposal is valid for ${proj.validadeProposta} from the date of issue.`,
       roteiroLabel: "Reference script",
     };
@@ -444,6 +458,8 @@ export function textosProposta(proj: Projeto): TextosProposta {
   return {
     investimentoLabel: "Investimento total do projeto",
     investimentoNota: nota,
+    terceirosNota:
+      "Faturados à parte e pagos diretamente a cada fornecedor. Não estão incluídos no investimento acima.",
     validade: `Esta proposta é válida por ${proj.validadeProposta} a partir da data de emissão.`,
     roteiroLabel: "Roteiro de referência",
   };
